@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0","numpy>=1.23.1","matplotlib>=3.5.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nrtools"
+version = "0.0.0"
+authors = [
+  { name="Oliver Steppohn", email="oliver.steppohn@uni-jena.de" },
+]
+description = "Numerical Relativity Forge"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "GPL-3.0-only"}
+
+[project.urls]
+"Homepage" = "https://github.com/spacetimecurv/NRForge.git"
