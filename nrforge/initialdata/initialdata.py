@@ -5,6 +5,7 @@
 # Built-in libraries.
 import os
 import sys
+import glob
 
 # Third-party libraries.
 import numpy as np
@@ -31,11 +32,32 @@ class Elliptica:
       - Check the convergence on specified domain patches.
       - Write a parameter file from template.
       - Write slurm submission scripts for specific machines.
+      - Print useful information about Elliptica (compilation etc.).
       - ...
   """
 
   def __init__(self):
     pass
+
+  # ------------ READER -------------
+  # Locate the initial data.
+  def locate_initial_data(self, path):
+    """
+    Small wrapper to locate created or running initial data output.
+    It needs to point to the directory holding the sub-directories
+      with the respective resolutions.
+    """
+    files = [os.path.join(dp, f) for dp, _, filenames in os.walk(path) \
+             for f in filenames if f.endswith('_properties.txt') or f.endswith('.par')]
+    if not os.path.exists(path):
+      raise ValueError(f'The following path does not exist: {path}')
+    elif not os.listdir(path):
+      raise ValueError(f'Directory is empty!')
+    else:
+      self.path = path
+
+      print(f'Set initial data output path to: {self.path}')
+
 
   # Print useful information.
   def print_information(self):
@@ -95,4 +117,5 @@ class Elliptica:
 
 # Testing the utility.
 elliptica = Elliptica()
-elliptica.print_information()
+#elliptica.print_information()
+elliptica.locate_initial_data('/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00_00')
