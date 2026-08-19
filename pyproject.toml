@@ -1,17 +1,26 @@
 [build-system]
-requires = ["setuptools>=61.0","numpy>=1.23.1","matplotlib>=3.5.3"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nrtools"
-version = "0.0.0"
-authors = [
-  { name="Oliver Steppohn", email="oliver.steppohn@uni-jena.de" },
-]
-description = "Numerical Relativity Forge"
+name = "nrforge"
+version = "0.1.0"
+description = "Numerical Relativity Forge: initial data generation and analysis utilities."
 readme = "README.md"
-requires-python = ">=3.7"
-license = {text = "GPL-3.0-only"}
+requires-python = ">=3.9"
+license = { text = "GPL-3.0-only" }
+authors = [
+  { name = "Oliver Steppohn", email = "oliver.steppohn@uni-jena.de" },
+]
+dependencies = [
+  "numpy >= 1.23.1",
+  "scipy >= 1.10.0",
+  "matplotlib >= 3.5.3",
+]
 
 [project.urls]
-"Homepage" = "https://github.com/spacetimecurv/NRForge.git"
+Homepage = "https://github.com/spacetimecurv/NRForge"
+Source = "https://github.com/spacetimecurv/NRForge"
+
+[tool.setuptools]
+packages = ["nrforge", "nrforge.utils", "nrforge.initialdata"]

@@ -1,2 +1,8 @@
 # Build artifacts
-nrtools.egg-info
+*.egg-info/
+build/
+dist/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
