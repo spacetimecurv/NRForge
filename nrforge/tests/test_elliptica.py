@@ -6,30 +6,39 @@
 import nrforge as nrf
 from nrforge import Elliptica
 from nrforge import load_elliptica_table, calculate_enthalpy_bounds
+from nrforge import get_elliptica_bhns_user_params_example, get_iterated_bh_mass
 
 #nrf.banner()
 
-# Testing the utility.
-elliptica = Elliptica(print_info=False)
-elliptica.locate_initial_data('/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/Diagnostics/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00_00')
-
-# Find per-resolution directories.
-elliptica.resolution_dirs()
-
-# Find a parfile in the per-resolution directories.
-elliptica.locate_parfile()
-
-# Parse the iteration schedule from the parfile.
-boundaries, total = elliptica.parse_iteration_schedule()
-
-# Locate/parse logfiles from a given path.
-elliptica.locate_logfiles('/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/Diagnostics/')
-recs = elliptica.parse_logs()
-
+# Testing the utility (mode 'analyze').
+elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00',
+                      mode='analyze', logs_path=None, print_info=False, user_params=None)
 # Check the progress and convergence.
-elliptica.initial_data_progress()
-elliptica.convergence(plot=False, save=False, output_dir=None)
+elliptica.initial_data_progress(print_timing=False)
+elliptica.convergence(plot=False, save=False)
 
-# Calculate the enthalpy bounds for a given EOS table.
-rows = load_elliptica_table('data/DD2_eos.txt', geo=False)
-calculate_enthalpy_bounds(rows, 5e-4, 0)
+# Testing the utility (mode 'create').
+mass = get_iterated_bh_mass(mass=4.3, sequence=[50, 50, 50, 20], gap=0.5)
+rows = load_elliptica_table(path='data/DD2_eos.txt', geo=False)
+h_floor, h_ceil = calculate_enthalpy_bounds(rows=rows, margin=5e-4, ceil_trim=0, print_info=False)
+user_params = {
+  'binary_separation'      : 40,
+  'bh_chi_x'               : 0.0,
+  'bh_chi_y'               : 0.0,
+  'bh_chi_z'               : 0.75,
+  'bh_mass'                : mass,
+  'ns_mass'                : 1.6,
+  'ns_eos_name'            : 'DD2',
+  'ns_units'               : 'compose',
+  'ns_eos_table_path'      : 'data/DD2_eos.txt',
+  'ns_eos_table_format'    : 'line,number_density,total_energy_density,pressure',
+  'ns_eos_enth_floor'      : h_floor,
+  'ns_eos_enth_ceil'       : h_ceil,
+  'ns_omega_x'             : 0.0,
+  'ns_omega_y'             : 0.0,
+  'ns_omega_z'             : 0.0
+}
+elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/test',
+                      mode='create', logs_path=None, print_info=False, user_params=user_params, system='BHNS')
+
+

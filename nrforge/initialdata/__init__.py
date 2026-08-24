@@ -4,14 +4,19 @@ Currently supported:
 
 - :mod:`~nrforge.initialdata.elliptica` — the Elliptica solver, wrapped by
   :class:`~nrforge.initialdata.elliptica.Elliptica`.
+
+Parameter-file templates for every solver live in
+:mod:`~nrforge.initialdata.templates`.
 """
 
 import importlib as _importlib
 
-_MODULES = {"elliptica"}
-_ATTRS = {"Elliptica": ".elliptica"}
+_MODULES = {"elliptica", "templates"}
+_ATTRS = {"Elliptica": ".elliptica", "get_elliptica_bhns_template": ".templates",
+          "get_elliptica_bhns_user_params_example": ".templates"}
 
-__all__ = ["elliptica", "Elliptica"]
+__all__ = ["elliptica", "Elliptica", "templates", "get_elliptica_bhns_template",
+           "get_elliptica_bhns_user_params_example", "get_iterated_bh_mass"]
 
 
 def __getattr__(name):

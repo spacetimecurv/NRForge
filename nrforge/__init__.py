@@ -8,20 +8,6 @@ Two subpackages:
   ``from nrforge.utils import lambda_tilde`` are equivalent.
 - :mod:`nrforge.initialdata` — interfaces to the initial data solvers, e.g.
   :class:`~nrforge.initialdata.elliptica.Elliptica`.
-
-The solver interfaces pull in ``matplotlib.pyplot`` and are therefore imported
-on first access only, which keeps a bare ``import nrforge`` cheap::
-
-    import nrforge
-
-    q = 1.2
-    lam = nrforge.lambda_tilde(q, 400.0, 900.0)
-
-    ell = nrforge.Elliptica()
-    ell.locate_initial_data("/path/to/run")
-    ell.convergence(plot=True)
-
-Adapted and modified from https://git.tpi.uni-jena.de/agonzalez/nrtools.
 """
 
 import importlib as _importlib
@@ -69,7 +55,12 @@ def banner():
 
 # Lazily imported names: the module they live in, keyed by attribute name.
 _LAZY_MODULES = {"initialdata"}
-_LAZY_ATTRS = {"Elliptica": ".initialdata.elliptica"}
+_LAZY_ATTRS = {
+    "Elliptica": ".initialdata.elliptica",
+    "get_elliptica_bhns_template": ".initialdata.templates",
+    "get_elliptica_bhns_user_params_example": ".initialdata.templates",
+    "get_iterated_bh_mass": ".initialdata.templates"
+}
 
 
 def __getattr__(name):
@@ -110,6 +101,10 @@ __all__ = [
     "BHNS_remnant_mass_model_Foucart2018",
     # Initial data solvers.
     "Elliptica",
+    # Parameter-file templates.
+    "get_elliptica_bhns_template",
+    "get_elliptica_bhns_user_params_example",
+    "get_iterated_bh_mass",
     # Meta.
     "banner",
     "__version__",

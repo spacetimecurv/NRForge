@@ -113,7 +113,7 @@ def load_elliptica_table(path: str, geo: bool) -> list:
     sys.exit("No usable rows parsed from %s (wrong --geo/format?)" % path)
   return rows
 
-def calculate_enthalpy_bounds(rows: list, margin: float, ceil_trim: int):
+def calculate_enthalpy_bounds(rows: list, margin: float, ceil_trim: int, print_info: bool) -> tuple:
   """
   Calculate the enthalpy bounds for a given equation-of-state table. The
   enthalpy bounds are set in Elliptica's parameter file.
@@ -124,7 +124,7 @@ def calculate_enthalpy_bounds(rows: list, margin: float, ceil_trim: int):
   ceil_trim (int): drop this many rows off high-density end for ceiling.
 
   Returns:
-  None.
+  The enthalpy bounds (floor, ceiling).
   """
   if not rows:
     raise SystemExit("Run load_elliptica_table() from utils first!")
@@ -159,31 +159,34 @@ def calculate_enthalpy_bounds(rows: list, margin: float, ceil_trim: int):
     "crossings": crossings
   }
 
-  print("=" * 70)
-  print("Rows parsed:", a["n_rows"])
-  print("=" * 70)
-  print(f"h range over full table:")
-  print(f"   min h = {a['h_min']:.16g}  at row {a['imin']} (dens={a['dip_dens']:.3e})")
-  print(f"   max h = {a['h_max']:.16g}  at row {a['imax']} (dens={a['max_dens']:.3e})")
+  if print_info:
+    print("=" * 70)
+    print("Rows parsed:", a["n_rows"])
+    print("=" * 70)
+    print(f"h range over full table:")
+    print(f"   min h = {a['h_min']:.16g}  at row {a['imin']} (dens={a['dip_dens']:.3e})")
+    print(f"   max h = {a['h_max']:.16g}  at row {a['imax']} (dens={a['max_dens']:.3e})")
 
-  monotonic = a["imin"] == 0
-  print("\nLow-density behaviour:")
-  if monotonic:
-    print("   h is monotonically increasing from the first row (min at row 0).")
-    print("   -> inversion is single valued for any floor above h[0].")
-  else:
-    print(f"   NON-MONOTONIC: h dips to a minimum at row {a['imin']} "
-          f"(dens={a['dip_dens']:.3e}).")
-    print(f"   pre-dip hump      = {a['pre_dip_hump']:.16g}")
-    print(f"   clean branch above hump starts at row {a['clean_idx']} "
-          f"(dens={a['clean_dens']:.3e}, h={a['clean_h']:.16g})")
-    print("   -> the floor MUST exceed the hump or it maps to two densities.")
+    monotonic = a["imin"] == 0
+    print("\nLow-density behaviour:")
+    if monotonic:
+      print("   h is monotonically increasing from the first row (min at row 0).")
+      print("   -> inversion is single valued for any floor above h[0].")
+    else:
+      print(f"   NON-MONOTONIC: h dips to a minimum at row {a['imin']} "
+            f"(dens={a['dip_dens']:.3e}).")
+      print(f"   pre-dip hump      = {a['pre_dip_hump']:.16g}")
+      print(f"   clean branch above hump starts at row {a['clean_idx']} "
+            f"(dens={a['clean_dens']:.3e}, h={a['clean_h']:.16g})")
+      print("   -> the floor MUST exceed the hump or it maps to two densities.")
 
-  print("\nRECOMMENDED bounds:")
-  print(f"   NS_EoS_enthalpy_floor   = {a['rec_floor']:.10f}")
-  print(f"   NS_EoS_enthalpy_ceiling = {a['rec_ceil']:.10f}"
-        + (f"   (row {a['ceil_row']}, {ceil_trim} trimmed)" if ceil_trim else "   (table max)"))
-  nc = len(a["crossings"](a["rec_floor"]))
-  print(f"   [check] recommended floor maps to {nc} density(ies) "
-        + ("-> OK" if nc <= 1 else "-> STILL AMBIGUOUS, raise --margin"))
+    print("\nRECOMMENDED bounds:")
+    print(f"   NS_EoS_enthalpy_floor   = {a['rec_floor']:.10f}")
+    print(f"   NS_EoS_enthalpy_ceiling = {a['rec_ceil']:.10f}"
+          + (f"   (row {a['ceil_row']}, {ceil_trim} trimmed)" if ceil_trim else "   (table max)"))
+    nc = len(a["crossings"](a["rec_floor"]))
+    print(f"   [check] recommended floor maps to {nc} density(ies) "
+          + ("-> OK" if nc <= 1 else "-> STILL AMBIGUOUS, raise --margin"))
+
+  return (a['rec_floor'], a['rec_ceil'])
 

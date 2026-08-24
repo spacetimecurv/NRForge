@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,5 +22,12 @@ dependencies = [
 Homepage = "https://github.com/spacetimecurv/NRForge"
 Source = "https://github.com/spacetimecurv/NRForge"
 
-[tool.setuptools]
-packages = ["nrforge", "nrforge.utils", "nrforge.initialdata"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nrforge*"]
+exclude = ["nrforge.tests*"]
+
+# Ship non-Python template files (parfile snippets, slurm scripts, ...)
+# that live next to the template modules.
+[tool.setuptools.package-data]
+"nrforge.initialdata.templates" = ["*.par", "*.sh", "*.txt"]

@@ -15,6 +15,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+# NRForge libraries.
+from nrforge import get_elliptica_bhns_template
+
 # ANSI styles used to decorate terminal reports.
 _BOLD = '1'
 _DIM = '2'
@@ -26,6 +29,13 @@ def _style(text, *codes):
     return text
   return f'\033[{";".join(codes)}m{text}\033[0m'
 
+# Timing format.
+def _fmt(sec):
+  sec = int(round(sec))
+  d, r = divmod(sec, 86400)
+  h, r = divmod(r, 3600)
+  m, s = divmod(r, 60)
+  return (f"{d}d " if d else "") + f"{h}h {m}m"
 
 #--------------- ELLIPTICA ID SOLVER ----------------
 class Elliptica:
@@ -42,20 +52,195 @@ class Elliptica:
       - ...
   """
 
-  def __init__(self, print_info=False):
+  def __init__(self, path, logs_path=None, mode=None, user_params=None,
+               system=None, print_info=False):
+    """
+    There are two modes:
+    - 'analyze': locates the initial data under the given path, i.e. searches for
+                 per-resolution directories in the specified directories, parses the
+                 resolutions, locates a parfile, and locates logfiles. If logs_path is
+                 None it will search for the log files inside of path, else it will
+                 take the specified path if the logs files are stored elsewhere.
+                 Furthermore, the status is checked, the ETA estimated and a convergence
+                 plot created.
+    - 'create': creates a initial data run directory and a parameter file based on
+                some specified user parameters for the given binary. A Bash script
+                can also be written and submitted.
+
+    Parameters:
+    path         (str): path where the initial data is created or existing.
+    logs_path    (str): path to the logs file if they do not exist on the ID level.
+    mode         (str): either 'analyze' or 'create'.
+    user_params (dict): dictionary with the binary parameters (only in 'create' mode).
+    system       (str): for which system to create initial data (currently only 'BHNS').
+    print_info  (bool): prints useful information about Elliptica.
+    """
     if print_info: self.print_information()
 
-    # Paths.
-    self.path         = None
-    self.parfile_path = None
-    self.logs_path    = None
-    self.resolutions  = {}
+    # Select the mode.
+    self.mode = mode
+    if self.mode != 'create' and self.mode != 'analyze':
+      raise SystemExit('Mode has to be either "create" or "analyze"!')
 
-    # Convergence data over all resolutions and patches.
-    self.conv        = defaultdict(lambda: defaultdict(lambda: defaultdict(dict))) # Constraints etc.
+    # If in analyze mode, locate initial data,
+    # per-resolution directories, parfile, and
+    # log-files. Check the status, estimate the
+    # ETA and plot the convergence.
+    if self.mode == 'analyze':
+      self.simname = path.split('/')[-1]
+      width = max([len(self.simname) + 2]) + 2
+      print(f'╭{"─" * width}╮')
+      print(f'│  {_style(self.simname, _BOLD)}{" " * (width - 2 - len(self.simname))}│')
+      print(f'╰{"─" * width}╯')
+      print(f"Assuming initial data exists under {_style(path, _CYAN)}...")
+      print(_style("Searching for output...", _BOLD))
+      self.locate_initial_data(path)  # locate ID
+      self.resolution_dirs()          # find per-resolution directories
+      self.locate_parfile()           # locate parfile
+      self.locate_logfiles(logs_path) # locate log-files
+      self.check_status()             # check status of ID
+      print(f"  {_style("$", _DIM)} Remaining time (estimated): {_fmt(self.initial_data_progress(print_timing=False))}")
+      self.convergence(plot=True, save=True) # plot convergence
 
-    # Maximum violation at each iteration over all patches.
-    self.conv_max    = defaultdict(dict)
+    # If in create mode, create a parfile under
+    # the specified path passing user parameters with the
+    # binary parameters. Depending on the machine, a
+    # slurm script will also be created.
+    if self.mode == 'create':
+      # Check if user_params are specified.
+      if user_params is None:
+        raise SystemExit('User parameters for the binary have to be specified in "create" mode!')
+      else:
+        self.user_params = user_params
+
+      # Check if the specifid system is supported.
+      if system != 'BHNS':
+        raise SystemExit('System has to be "BHNS" (currently only supported with "create")!')
+      else:
+        self.system = system
+
+      # Make the parfile.
+      print(_style("Creating initial data setup...", _BOLD))
+      self.make_parfile(path)
+
+  # ------------ WRITER -------------
+  # Create a parfile from the template.
+  def make_parfile(self, path):
+    """
+    Create a initial data run directory and parameter file.
+
+    Parameters:
+    path (str): path to where the parameter file should be written.
+    """
+    # Parfile write function.
+    def write_parfile(path, params):
+      """
+      Writes the parameter file in a nice format.
+
+      Parameters:
+      path    (str): path to the parameter file.
+      params (dict): the template filled parameter dict.
+      """
+      with open(path, 'w') as f:
+        f.write(f"#{40 * '-'}#\n")
+        f.write("# Physics:\n")
+        f.write(f"#{40 * '-'}#\n")
+        for key, value in params.items():
+          # Write the section header preceding this parameter, if any.
+          if key == "Project":
+            f.write("\n#### Project:\n")
+          elif "_separation" in key:
+            f.write("\n#### Binary parameters:\n")
+          elif "_irreducible_mass" in key:
+            f.write("\n#### BH:\n")
+          elif "_baryonic_mass" in key:
+            f.write("\n#### NS:\n")
+          elif key == "SYS_initialize":
+            f.write("\n#### system:\n")
+          elif key == "Free_data_conformal_metric":
+            f.write("\n#### free data:\n")
+          elif key == "ADM_constraints_method":
+            f.write("\n#### ADM:\n")
+          elif key == "checkpoint_every":
+            f.write(f"\n#{40 * '-'}#\n")
+            f.write("# Settings:\n")
+            f.write(f"#{40 * '-'}#\n")
+            f.write("\n#### checkpoint:\n")
+          elif key == "Derivative_Method":
+            f.write("\n#### basics:\n")
+          elif key == "grid_kind":
+            f.write(f"\n#{40 * '-'}#\n")
+            f.write("# Grid and Geometry:\n")
+            f.write(f"#{40 * '-'}#\n")
+            f.write("\n#### grid:\n")
+          elif key == "n_a":
+            f.write("\n#### resolutions:\n")
+          elif key == "Eq_type":
+            f.write(f"\n#{40 * '-'}#\n")
+            f.write("# Equations and Solve:\n")
+            f.write(f"#{40 * '-'}#\n")
+            f.write("\n#### what and where to solve:\n")
+          elif key == "solve_Order":
+            f.write("\n#### solve settings:\n")
+          elif key == "txt_output_0d":
+            f.write(f"\n#{40 * '-'}#\n")
+            f.write("# Print:\n")
+            f.write(f"#{40 * '-'}#\n")
+            f.write("\n#### outputs:\n")
+
+          # Write the parameter itself.
+          f.write("%s = %s\n" % (key, value))
+
+    # Fill the template.
+    params = self.user_params
+    PARDIC = {}
+    if self.system == 'BHNS':
+      PARDIC = get_elliptica_bhns_template()
+      PARDIC['BHNS_separation']         = params['binary_separation']
+      PARDIC['BH_chi_x']                = params['bh_chi_x']
+      PARDIC['BH_chi_y']                = params['bh_chi_y']
+      PARDIC['BH_chi_z']                = params['bh_chi_z']
+      PARDIC['BH_irreducible_mass']     = params['bh_mass']
+      PARDIC['NS_baryonic_mass']        = params['ns_mass']
+      PARDIC['NS_EoS_description']      = params['ns_eos_name']
+      PARDIC['NS_EoS_unit']             = params['ns_units']
+      PARDIC['NS_EoS_table_path']       = params['ns_eos_table_path']
+      PARDIC['NS_EoS_table_format']     = params['ns_eos_table_format']
+      PARDIC['NS_EoS_enthalpy_floor']   = params['ns_eos_enth_floor']
+      PARDIC['NS_EoS_enthalpy_ceiling'] = params['ns_eos_enth_ceil']
+      PARDIC['NS_Omega_x']              = params['ns_omega_x']
+      PARDIC['NS_Omega_y']              = params['ns_omega_y']
+      PARDIC['NS_Omega_z']              = params['ns_omega_z']
+
+    # Write the parameter file.
+    obj1, obj2 = PARDIC["Project"].split("_")[0], \
+                 PARDIC["Project"].split("_")[1]
+    m1, m2     = 0.0, 0.0
+    if self.system == 'BHNS':
+      if "->" in PARDIC['BH_irreducible_mass']: # iterated mass
+        m1     = float(PARDIC['BH_irreducible_mass'].split("->")[-1])
+      else:
+        m1     = float(PARDIC['BH_irreducible_mass'])
+      m2       = float(PARDIC['NS_baryonic_mass'])
+      s1       = np.sqrt(float(PARDIC['BH_chi_x'])**2 + float(PARDIC['BH_chi_y'])**2 \
+                         + float(PARDIC['BH_chi_z'])**2)
+      s2       = np.sqrt(float(PARDIC['NS_Omega_x'])**2 + float(PARDIC['NS_Omega_y'])**2 \
+                               + float(PARDIC['NS_Omega_z'])**2)
+      sep      = PARDIC['BHNS_separation']
+      self.simname = PARDIC['NS_EoS_description'] + f"_M{obj1}-" + str(round(m1,1)) + f"_s{obj1}-" \
+                     + str(round(s1,2)) + f"--M{obj2}-" + str(round(m2,2)) + f"_s{obj2}-" + str(round(s2,2)) \
+                     + "--d" + str(sep)
+      self.path    = os.path.join(path, self.simname)
+      try:
+        os.mkdir(self.path)
+        print(f"  {_style("$", _DIM)} Directory created under {_style(self.path, _CYAN)}")
+      except FileExistsError:
+        print(f"  {_style("$", _DIM)} Directory exists already under {_style(self.path, _CYAN)}")
+
+      # Write the parfile.
+      simpath = os.path.join(self.path, self.simname+".par")
+      write_parfile(simpath, PARDIC)
+      print(f"  {_style("$", _DIM)} Parfile written to {_style(simpath, _CYAN)}")
 
   # ------------ READER -------------
   # Locate the initial data.
@@ -76,13 +261,17 @@ class Elliptica:
     elif not os.listdir(path):
       raise ValueError(f'Directory is empty!')
     else:
-      cands = glob.glob(os.path.join(path, "*_[0-9]*x[0-9]*x[0-9]*_00"))
-      if cands:
-          self.path = path
-      else:
-        raise SystemExit("Could not locate per-resolution directories under %s" % path)
+      parent_path = os.path.join(path, self.simname+'_00')
+      if not os.path.exists(parent_path):
+        raise SystemExit(f'Could not locate {parent_path} under the specified path!')
 
-      print(f'Set initial data output path to: {self.path}')
+      cands = glob.glob(os.path.join(parent_path, "*_[0-9]*x[0-9]*x[0-9]*_00"))
+      if cands:
+          self.path = parent_path
+      else:
+        raise SystemExit("Could not locate per-resolution directories under %s" % parent_path)
+
+      print(f'  {_style("$", _DIM)} Set initial data output path to: {_style(self.path, _CYAN)}')
 
   # ------------ PARFILE -------------
   # Locate a parfile.
@@ -112,11 +301,11 @@ class Elliptica:
       print('Could not locate a parfile with signature .par.' \
             'Check the per-resolution folders!')
     else:
-      print(f'Found parfile under: {self.parfile_path}')
+      print(f'  {_style("$", _DIM)} Found parfile under: {_style(self.parfile_path, _CYAN)}')
 
   # ------------ LOG-FILES -------------
   # Locate slurm logfiles.
-  def locate_logfiles(self, path):
+  def locate_logfiles(self, path=None):
     """
     Locate logfiles under the specified path.
 
@@ -126,6 +315,9 @@ class Elliptica:
     Returns:
     None; sets the 'parfile_path' class member
     """
+    if path is None:
+      path = os.path.dirname(self.path)
+
     logs = sorted(glob.glob(os.path.join(path, 'slurm-*.out')), key=os.path.getmtime)
     if not logs:
        logs = sorted(glob.glob(os.path.join(path, '*.out')), key=os.path.getmtime)
@@ -134,7 +326,7 @@ class Elliptica:
                           'slurm-*.out or *.out. Check the path!')
     else:
       self.logs_path = logs
-      print(f'Found logs under: {self.logs_path}')
+      print(f'  {_style("$", _DIM)} Found logs under: {_style(self.logs_path, _CYAN)}')
 
   # ------------ RESOLUTION DIRS -------------
   # Locate the initial data.
@@ -167,11 +359,11 @@ class Elliptica:
                        "but they don't match the format. Check!")
     else:
       self.resolutions = out
-      print(f"Found resolutions: {list(self.resolutions.keys())}")
+      print(f"  {_style("$", _DIM)} Found resolutions: {list(self.resolutions.keys())}")
 
   # ------------ RESOLUTION DIRS -------------
   # Locate the initial data.
-  def convergence(self, plot=False, save=False, output_dir=None):
+  def convergence(self, plot=False, save=False):
     """
     Analyze the convergence per resolution.
     Results can be plotted.
@@ -188,6 +380,12 @@ class Elliptica:
     for each iteration per resolution per patch; can plot the constraints at the
     last iteration at a given resolution
     """
+    # Convergence data over all resolutions and patches.
+    self.conv = defaultdict(lambda: defaultdict(lambda: defaultdict(dict))) # Constraints etc.
+
+    # Maximum violation at each iteration over all patches.
+    self.conv_max = defaultdict(dict)
+
     res = self.resolutions
     if self.path is None or not res:
       raise SystemExit("First locate ID with locate_initial_data(path) "\
@@ -298,10 +496,9 @@ class Elliptica:
       if not save:
         plt.show()
       else:
-        if output_dir is None:
-          plt.savefig(os.path.join(self.path, 'conv.png'), dpi=150)
-        else:
-          plt.savefig(os.path.join(output_dir, 'conv.png'), dpi=150)
+        out_path = os.path.join(self.path, 'convergence.png')
+        plt.savefig(out_path, dpi=150)
+        print(f"  {_style("$", _DIM)} Convergence plot saved under {_style(out_path, _CYAN)}")
 
   # ------------ INFORMATION -------------
   # Print useful information.
@@ -496,74 +693,38 @@ class Elliptica:
     return counts
 
   # Print per-resolution timing and progress.
-  def initial_data_progress(self, outlier_factor=4.0):
+  def initial_data_progress(self, print_timing=False, outlier_factor=4.0):
     """
     Print per-resolution timing and progress plus the estimated
     time for the initial data to finish.
 
     Parameters:
-    outlier_factor (float):
+    outlier_factor (float): how many outliers from the median.
 
     Returns:
-    None
+    ETA time.
     """
-    # Timing format.
-    def fmt(sec):
-      sec = int(round(sec))
-      d, r = divmod(sec, 86400)
-      h, r = divmod(r, 3600)
-      m, s = divmod(r, 60)
-      return (f"{d}d " if d else "") + f"{h}h {m}m"
-
     # Parse the logs and get the deltas.
     boundaries, total = self.parse_iteration_schedule()
     recs   = self.parse_logs()
     deltas = self.logs_per_iter_deltas(recs)
 
-    # General information.
-    print("\nLOGS INFORMATION")
-    print("=" * 72)
-    print("Logs:   ", ", ".join(self.logs_path))
-    print("Schedule:", " -> ".join(f"N={N}(x{e-s})" for s, e, N in boundaries),
-          f"| total = {total}")
+    # Compute the metrics.
     res_seen = sorted({r for r, _, _ in recs if r is not None})
-    print(f"Resolutions present in log(s): {res_seen}   (restart-aware)")
-    print("=" * 72)
-
-    # per-resolution timing
-    print("\nPER-RESOLUTION TIMING")
-    print("=" * 72)
     by_res = {}
     for r, dt in deltas:
       by_res.setdefault(r, []).append(dt)
-    print(f"{'N':>4} {'samples':>8} {'median/it':>11} {'min':>9} {'max':>10} {'stalls':>7}")
 
+    # per-resolution timing.
     med = {}
     for N in sorted(by_res):
       v = by_res[N]; mv = statistics.median(v)
       good = [x for x in v if x <= outlier_factor * mv]
       med[N] = statistics.median(good) if good else mv
-      print(f"{N:>4} {len(v):>8} {fmt(med[N]):>11} {fmt(min(v)):>9} {fmt(max(v)):>10} "
-            f"{len(v)-len(good):>7}")
 
-    print("  (median/min/max over clean iterations; 'stalls' = excluded outliers)")
-    print("=" * 72)
-
-    # progress + ETA
-    print("\nPROGESS + ETA")
-    print("=" * 72)
+    # Progress + ETA.
     done = self.counts_from_diagnostics()
-    print(f"Completed iterations per resolution (from diagnostics"
-          + (f" in {os.path.basename(self.path)}" if self.path else ", not found") + "):")
-    for s, e, N in boundaries:
-      print(f"   N={N}: {done.get(N,'?')} / {e-s} scheduled")
-
-    if not med:
-      print("\nNo clean per-iteration samples; cannot estimate ETA.")
-      return
     hi = max(med)
-
-    print("\nEstimated remaining wall time (measured medians; ~2x/level extrapolation if unmeasured):")
     remaining = 0.0
     for s, e, N in boundaries:
       sched = e - s
@@ -576,7 +737,80 @@ class Elliptica:
       else:
         t, src = med[hi] * (2.0 ** ((N - hi) / 2.0)), f"extrap from N={hi}"
       remaining += rem * t
-      print(f"   N={N}: {rem:>4} iters x {fmt(t)}/it = {fmt(rem*t):>10}  ({src})")
 
-    print(f"\t{fmt(remaining)}  ({remaining/3600:.1f} h)")
-    print("=" * 72)
+    # General information.
+    if print_timing:
+      print("\nLOGS INFORMATION")
+      print("=" * 72)
+      print("Logs:   ", ", ".join(self.logs_path))
+      print("Schedule:", " -> ".join(f"N={N}(x{e-s})" for s, e, N in boundaries),
+            f"| total = {total}")
+      print(f"Resolutions present in log(s): {res_seen}   (restart-aware)")
+      print("=" * 72)
+
+      # per-resolution timing
+      print("\nPER-RESOLUTION TIMING")
+      print("=" * 72)
+      print(f"{'N':>4} {'samples':>8} {'median/it':>11} {'min':>9} {'max':>10} {'stalls':>7}")
+
+      for N in sorted(by_res):
+        v = by_res[N]; mv = statistics.median(v)
+        good = [x for x in v if x <= outlier_factor * mv]
+        print(f"{N:>4} {len(v):>8} {_fmt(med[N]):>11} {_fmt(min(v)):>9} {_fmt(max(v)):>10} "
+              f"{len(v)-len(good):>7}")
+
+      print("  (median/min/max over clean iterations; 'stalls' = excluded outliers)")
+      print("=" * 72)
+
+      # progress + ETA
+      print("\nPROGESS + ETA")
+      print("=" * 72)
+      print(f"Completed iterations per resolution (from diagnostics"
+            + (f" in {os.path.basename(self.path)}" if self.path else ", not found") + "):")
+      for s, e, N in boundaries:
+        print(f"   N={N}: {done.get(N,'?')} / {e-s} scheduled")
+
+      if not med:
+        print("\nNo clean per-iteration samples; cannot estimate ETA.")
+        return
+
+      print("\nEstimated remaining wall time (measured medians; ~2x/level extrapolation if unmeasured):")
+      remaining = 0.0
+      for s, e, N in boundaries:
+        sched = e - s
+        d = done.get(N, 0 if N not in med else sched)
+        rem = max(0, sched - d)
+        if rem == 0:
+          continue
+        if N in med:
+          t, src = med[N], "measured"
+        else:
+          t, src = med[hi] * (2.0 ** ((N - hi) / 2.0)), f"extrap from N={hi}"
+        print(f"   N={N}: {rem:>4} iters x {_fmt(t)}/it = {_fmt(rem*t):>10}  ({src})")
+
+      print(f"\t{_fmt(remaining)}  ({remaining/3600:.1f} h)")
+      print("=" * 72)
+      return
+    else:
+      return remaining
+
+  # Get the status of the current initial data.
+  def check_status(self):
+    """
+    Checks the status of the simulation based on the logfile.
+    """
+    try:
+      _ = os.listdir(self.path)
+      self.status = 'Ongoing'
+    except FileNotFoundError:
+      self.status = 'Not started'
+
+    for log_file in self.logs_path:
+      with open(log_file, 'r') as hrf:
+        cont = hrf.read()
+        done = "} construct_initial_data :))"
+        if done in cont:
+          self.status = 'Done'
+          break
+
+    print(f"  {_style("$", _DIM)} Status: {self.status}")
