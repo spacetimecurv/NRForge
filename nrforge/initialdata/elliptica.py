@@ -9,6 +9,7 @@ import glob
 import re
 from collections import defaultdict
 import statistics
+import subprocess
 
 # Third-party libraries.
 import numpy as np
@@ -241,6 +242,71 @@ class Elliptica:
       simpath = os.path.join(self.path, self.simname+".par")
       write_parfile(simpath, PARDIC)
       print(f"  {_style("$", _DIM)} Parfile written to {_style(simpath, _CYAN)}")
+
+  # Write a slurm script.
+  def write_bashfile(self, bashname, cluster, id_exe):
+    """
+    Writes a bash script for the specified cluster and under
+    the specified name.
+
+    Parameters:
+    bashname (str): name of the bashfile.
+    cluster  (str): name of the cluster to run on.
+    id_exe   (str): path to the Elliptica executable.
+    """
+    cluster_list = ["ARA"]
+    if cluster not in cluster_list:
+      raise SystemExit(f"Currently supported clusters are: {cluster_list}")
+
+    # Cluster specifics.
+    if cluster == "ARA":
+      cluster_setup = {
+        "partition": "s_standard",
+        "cpus"     : "36",
+        "wallclock": "8-00:00:00",
+        "memory"   : "180G",
+        "modules"  : ["intel/oneapi/latest", "mpi/openmpi/5.0.2/gcc"]
+      }
+
+    bash_path = os.path.join(self.path, bashname)
+    bss = open(bash_path, 'a')
+    bss.write('#!/bin/bash\n')
+    bss.write(f'#SBATCH --job-name={self.simname}\n')
+    bss.write('#SBATCH --output=slurm-%j.out\n')
+    bss.write('#SBATCH --error=slurm-%j.err\n')
+    bss.write(f'#SBATCH --partition={cluster_setup['partition']}\n')
+    bss.write('#SBATCH --nodes=1\n')
+    bss.write('#SBATCH --ntasks=1\n')
+    bss.write(f'#SBATCH --cpus-per-task={cluster_setup['cpus']}\n')
+    bss.write(f'#SBATCH --time={cluster_setup['wallclock']}\n')
+    bss.write(f'#SBATCH --mem={cluster_setup['memory']}\n')
+    bss.write('\n# ==============================\n')
+    bss.write('# Modules\n')
+    bss.write('# ==============================\n\n')
+    bss.write('module purge\n')
+    for mod in cluster_setup['modules']:
+      bss.write(f'module load {mod}\n')
+    bss.write('\n# ==============================\n')
+    bss.write('# Job\n')
+    bss.write('# ==============================\n\n')
+    bss.write('export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK\n')
+    bss.write(f'cd {self.path}\n\n')
+    bss.write(f"{id_exe} -nt $SLURM_CPUS_PER_TASK {self.simname}.par")
+    bss.close()
+
+    print(f"  {_style("$", _DIM)} Wrote bash script to {_style(bash_path, _CYAN)}")
+    self.bash_path = bash_path
+
+  # Submit the job.
+  def submit_job(self):
+    """
+    Submit the job using the written slurm file.
+    """
+    if not self.bash_path:
+      raise SystemExit("Slurm file has to be written before submitting!")
+
+    res = subprocess.run(['sbatch', self.bash_path], capture_output=True, text=True)
+    print(f"  {_style("$", _DIM)} {res.stdout}")
 
   # ------------ READER -------------
   # Locate the initial data.
