@@ -10,7 +10,8 @@ Every name below is also re-exported from the top-level :mod:`nrforge`.
 
 from .constants import G_SI, c_SI, Msun_SI
 from .variables import lambda_tilde, chi_effective
-from .eos_utils import compose_get_M_from_MR, compose_get_R_from_MR
+from .eos_utils import compose_get_M_from_MR, compose_get_R_from_MR, load_elliptica_table, \
+                       calculate_enthalpy_bounds
 from .fits import normalized_R_ISCO, BHNS_remnant_mass_model_Foucart2018
 
 from . import constants
@@ -26,6 +27,8 @@ __all__ = [
     "chi_effective",
     "compose_get_M_from_MR",
     "compose_get_R_from_MR",
+    "load_elliptica_table",
+    "calculate_enthalpy_bounds",
     "normalized_R_ISCO",
     "BHNS_remnant_mass_model_Foucart2018",
     "constants",

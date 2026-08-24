@@ -5,6 +5,7 @@
 # Import the Elliptica class.
 import nrforge as nrf
 from nrforge import Elliptica
+from nrforge import load_elliptica_table, calculate_enthalpy_bounds
 
 #nrf.banner()
 
@@ -25,5 +26,10 @@ boundaries, total = elliptica.parse_iteration_schedule()
 elliptica.locate_logfiles('/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/Diagnostics/')
 recs = elliptica.parse_logs()
 
+# Check the progress and convergence.
 elliptica.initial_data_progress()
 elliptica.convergence(plot=False, save=False, output_dir=None)
+
+# Calculate the enthalpy bounds for a given EOS table.
+rows = load_elliptica_table('data/DD2_eos.txt', geo=False)
+calculate_enthalpy_bounds(rows, 5e-4, 0)

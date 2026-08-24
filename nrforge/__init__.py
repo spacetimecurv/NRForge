@@ -34,6 +34,8 @@ from .utils import (
     chi_effective,
     compose_get_M_from_MR,
     compose_get_R_from_MR,
+    load_elliptica_table,
+    calculate_enthalpy_bounds,
     normalized_R_ISCO,
     BHNS_remnant_mass_model_Foucart2018,
 )
@@ -101,6 +103,8 @@ __all__ = [
     # EOS utilities.
     "compose_get_M_from_MR",
     "compose_get_R_from_MR",
+    "load_elliptica_table",
+    "calculate_enthalpy_bounds",
     # Fits.
     "normalized_R_ISCO",
     "BHNS_remnant_mass_model_Foucart2018",
