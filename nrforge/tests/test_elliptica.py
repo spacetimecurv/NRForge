@@ -4,9 +4,10 @@
 
 # Import the Elliptica class.
 import nrforge as nrf
-from nrforge import Elliptica
-from nrforge import load_elliptica_table, calculate_enthalpy_bounds
-from nrforge import get_elliptica_bhns_user_params_example, get_iterated_bh_mass
+from nrforge.initialdata.elliptica import Elliptica
+from nrforge.utils.eos_utils import load_elliptica_table, calculate_enthalpy_bounds
+from nrforge.initialdata.templates.elliptica_templates import get_elliptica_bhns_user_params_example, \
+                                                              get_iterated_bh_mass
 
 #nrf.banner()
 

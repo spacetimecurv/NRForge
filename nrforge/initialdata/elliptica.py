@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 # NRForge libraries.
-from nrforge import get_elliptica_bhns_template
+from .templates.elliptica_templates import get_elliptica_bhns_template
 
 # ANSI styles used to decorate terminal reports.
 _BOLD = '1'
