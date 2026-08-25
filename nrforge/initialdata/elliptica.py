@@ -10,6 +10,8 @@ import re
 from collections import defaultdict
 import statistics
 import subprocess
+import json
+from datetime import datetime
 
 # Third-party libraries.
 import numpy as np
@@ -18,6 +20,7 @@ import matplotlib as mpl
 
 # NRForge libraries.
 from .templates.elliptica_templates import get_elliptica_bhns_template
+from ..utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
 
 # ANSI styles used to decorate terminal reports.
 _BOLD = '1'
@@ -89,6 +92,11 @@ class Elliptica:
     # ETA and plot the convergence.
     if self.mode == 'analyze':
       self.simname = path.split('/')[-1]
+      if "BH" and "NS" in self.simname:
+        self.system = "BHNS"
+      else:
+        raise SystemExit("Could not find object initials in simulation name, i.e. " \
+                         "could not determine the system!")
       width = max([len(self.simname) + 2]) + 2
       print(f'╭{"─" * width}╮')
       print(f'│  {_style(self.simname, _BOLD)}{" " * (width - 2 - len(self.simname))}│')
@@ -98,10 +106,15 @@ class Elliptica:
       self.locate_initial_data(path)  # locate ID
       self.resolution_dirs()          # find per-resolution directories
       self.locate_parfile()           # locate parfile
+      self.read_parfile()             # read the parfile
       self.locate_logfiles(logs_path) # locate log-files
+      self.locate_properties()        # locate <system>_properties.txt
+      self.read_properties()          # read <system>_properties.txt
       self.check_status()             # check status of ID
+      self.check_accuracy()           # check accuracy
       print(f"  {_style("$", _DIM)} Remaining time (estimated): {_fmt(self.initial_data_progress(print_timing=False))}")
       self.convergence(plot=True, save=True) # plot convergence
+      self.write_metadata()           # write metadata about the binary
 
     # If in create mode, create a parfile under
     # the specified path passing user parameters with the
@@ -308,7 +321,7 @@ class Elliptica:
     res = subprocess.run(['sbatch', self.bash_path], capture_output=True, text=True)
     print(f"  {_style("$", _DIM)} {res.stdout}")
 
-  # ------------ READER -------------
+  # ------------ ID -------------
   # Locate the initial data.
   def locate_initial_data(self, path):
     """
@@ -327,17 +340,179 @@ class Elliptica:
     elif not os.listdir(path):
       raise ValueError(f'Directory is empty!')
     else:
-      parent_path = os.path.join(path, self.simname+'_00')
-      if not os.path.exists(parent_path):
-        raise SystemExit(f'Could not locate {parent_path} under the specified path!')
+      self.parent_path = path
+      child_path = os.path.join(path, self.simname+'_00')
+      if not os.path.exists(child_path):
+        raise SystemExit(f'Could not locate {child_path} under the specified path!')
 
-      cands = glob.glob(os.path.join(parent_path, "*_[0-9]*x[0-9]*x[0-9]*_00"))
+      cands = glob.glob(os.path.join(child_path, "*_[0-9]*x[0-9]*x[0-9]*_00"))
       if cands:
-          self.path = parent_path
+          self.path = child_path
       else:
-        raise SystemExit("Could not locate per-resolution directories under %s" % parent_path)
+        raise SystemExit("Could not locate per-resolution directories under %s" % child_path)
 
       print(f'  {_style("$", _DIM)} Set initial data output path to: {_style(self.path, _CYAN)}')
+
+  # ------------ PROPERTIES ------------
+  # Locate the <system>_properties.txt file.
+  def locate_properties(self):
+    """
+    Reads an existing <system>_properties.txt file from the
+    highest resolution directory existing.
+    """
+    if not self.resolutions:
+      raise SystemExit("Locate per-resolution directories first with resolution_dirs()!")
+
+    # Locate the properties file.
+    keys = list(self.resolutions.keys())
+    self.properties_path = None
+    for file in os.listdir(self.resolutions[keys[-1]]):
+      if file.endswith("_properties.txt"):
+        self.properties_path = os.path.join(self.resolutions[keys[-1]], file)
+        print(f"  {_style("$", _DIM)} Found properties under: {_style(self.properties_path, _CYAN)}")
+
+    if self.properties_path is None:
+      raise SystemExit("Properties file not found in the highest-resolution folder." \
+                       "Check the folder!")
+
+  # Read the metadata from properties.
+  def read_properties(self):
+    """
+    Reads metadata into a dictionary from the <system>_properties.txt.
+    """
+    if not self.properties_path:
+      raise SystemExit("Locate the <system>_properties.txt first with locate_properties()!")
+
+    dic = {}
+    with open (self.properties_path) as file:
+      dic['simname'] = self.simname
+      for i, line in enumerate(file):
+        if i < 3 or len(line.strip()) == 0:
+          continue
+        else:
+          k, v = line.strip().split('=')
+          dic[k.strip()] = v.strip()
+
+    file.close()
+    self.prop_dic = dic
+    print(f"  {_style("$", _DIM)} Read properties and stored metadata...")
+
+  # Check the accuracy from the properties file.
+  def check_accuracy(self):
+    """
+    Compares the expected target quantities from the parfile with
+    the current quantities from the properties file.
+    """
+    if not self.par_dic:
+      raise SystemExit("Read parfile first with read_parfile()!")
+    if not self.prop_dic:
+      raise SystemExit("Read properties file first with read_properties()!")
+
+    # Parse based on the system.
+    pardic  = self.par_dic
+    propdic = self.prop_dic
+    if self.system == 'BHNS':
+      # Expected values.
+      bhmass_expected = float(pardic['BH_irreducible_mass'])
+      bhchiz_expected = float(pardic['BH_chi_z'])
+      nsmass_expected = float(pardic['NS_baryonic_mass'])
+
+      # Current values.
+      bhmass_current  = float(propdic['BH_irreducible_mass_current'])
+      bhchiz_current  = float(propdic['BH_chi_z_current'])
+      nsmass_current  = float(propdic['NS_baryonic_mass_current'])
+
+      # Errors.
+      bhmass_error    = np.abs(bhmass_current - bhmass_expected)
+      bhchiz_error    = np.abs(bhchiz_current - bhchiz_expected)
+      nsmass_error    = np.abs(nsmass_current - nsmass_expected)
+
+      # Print.
+      bhmass_error_string = f"BH mass error: {bhmass_error * 100 / bhmass_expected:.2f}%"
+      bhchiz_error_string = f"BH chiz error: {bhchiz_error * 100 / bhchiz_expected:.2f}%"
+      nsmass_error_string = f"NS mass error: {nsmass_error * 100 / nsmass_expected:.2f}%"
+      width = max([len(bhmass_error_string) + 2,
+                   len(bhchiz_error_string) + 2,
+                   len(nsmass_error_string) + 2]) + 2
+      print(f'  {_style("$", _DIM)} Accuracy:')
+      print(f'    ╭{"─" * width}╮')
+      print(f'    │  {_style(bhmass_error_string, _BOLD)}{" " * (width - 2 - len(bhmass_error_string))}│')
+      print(f'    │  {_style(bhchiz_error_string, _BOLD)}{" " * (width - 2 - len(bhchiz_error_string))}│')
+      print(f'    │  {_style(nsmass_error_string, _BOLD)}{" " * (width - 2 - len(nsmass_error_string))}│')
+      print(f'    ╰{"─" * width}╯')
+
+    else:
+      raise SystemExit("Set the 'system' (currently supported: 'BHNS')!")
+
+  # Write metadata to file.
+  def write_metadata(self):
+    """
+    Writes important metadata of this initial data to a
+    file.
+    """
+    if not self.prop_dic:
+      raise SystemExit("Writing metadata requires reading properties with read_properties()!")
+
+    # Get the timestamp of the highest-resolution
+    # checkpoint.
+    keys    = list(self.resolutions.keys())
+    check_path = os.path.join(self.resolutions[keys[-1]], "checkpoint.dat")
+    if not os.path.exists(check_path):
+      raise SystemExit("Could not find the 'checkpoint.dat' file in " \
+                       "the highest-resolution folder. Check!")
+    created = datetime.fromtimestamp(os.path.getmtime(check_path)).date().isoformat()
+
+    # Get the component masses.
+    if self.system == "BHNS":
+      metadata = {
+        "system" : self.system,
+        "simname": self.simname,
+        "created": created,
+        "code"   : "Elliptica",
+        "properties": {
+          "separation": float(self.prop_dic[f"{self.system}_separation"]),
+          "omega"     : float(self.prop_dic[f"{self.system}_angular_velocity"]),
+          "mass ratio": float(self.prop_dic[f"{self.system}_mass_ratio"]),
+          "total ADM mass": float(self.prop_dic[f"{self.system}_ADM_mass"]),
+          "total ADM angular momentum": np.sqrt(float(self.prop_dic[f"{self.system}_Jx_ADM"])**2 \
+                                              + float(self.prop_dic[f"{self.system}_Jy_ADM"])**2 \
+                                              + float(self.prop_dic[f"{self.system}_Jz_ADM"])**2),
+          "BH irreducible mass"  : float(self.prop_dic["BH_irreducible_mass_current"]),
+          "BH christodoulou mass": float(self.prop_dic["BH_Christodoulou_mass_current"]),
+          "BH chi-x"             : float(self.prop_dic["BH_chi_x_current"]),
+          "BH chi-y"             : float(self.prop_dic["BH_chi_y_current"]),
+          "BH chi-z"             : float(self.prop_dic["BH_chi_z_current"]),
+          "NS baryonic mass"     : float(self.prop_dic["NS_baryonic_mass_current"]),
+          "NS TOV ADM mass"      : float(self.prop_dic["NS_TOV_ADM_mass"]),
+          "NS Omega-x"           : float(self.prop_dic["NS_Omega_x"]),
+          "NS Omega-y"           : float(self.prop_dic["NS_Omega_y"]),
+          "NS Omega-z"           : float(self.prop_dic["NS_Omega_z"])
+        },
+        "eos": {
+          "type" : self.prop_dic["NS_EoS_type"],
+          "name" : self.prop_dic["NS_EoS_description"],
+          "units": self.prop_dic["NS_EoS_unit"]
+        },
+        "com": {
+          "com-x": float(self.prop_dic[f"{self.system}_x_CM"]),
+          "com-y": float(self.prop_dic[f"{self.system}_y_CM"]),
+          "com-z": float(self.prop_dic[f"{self.system}_z_CM"])
+        },
+        "gw": {
+          "initial frequency [Hz]": get_id_gw_frequency_Hz(float(self.prop_dic[f"{self.system}_angular_velocity"])),
+          "initial frequency (22) [Hz]": get_id_gw_frequency_Hz_22(float(self.prop_dic[f"{self.system}_angular_velocity"]),
+                                                                   float(self.prop_dic[f"{self.system}_ADM_mass"]))
+        }
+      }
+
+    # Write the file.
+    json_path = os.path.join(self.parent_path, "metadata.json")
+    with open(json_path, "w") as f:
+      json.dump(metadata, f, indent=4)
+
+    if os.path.exists(json_path):
+      self.json_path = json_path
+      print(f"  {_style("$", _DIM)} Created a metadata file under: {_style(self.json_path, _CYAN)}")
 
   # ------------ PARFILE -------------
   # Locate a parfile.
@@ -368,6 +543,39 @@ class Elliptica:
             'Check the per-resolution folders!')
     else:
       print(f'  {_style("$", _DIM)} Found parfile under: {_style(self.parfile_path, _CYAN)}')
+
+  # Read the parfile.
+  def read_parfile(self):
+    """
+    Read the parfile of the specified path and then
+    returns a dictionary.
+    """
+    if not self.parfile_path:
+      raise SystemExit("Locate parfile first with locate_parfile()!")
+
+    # Read the parfile first.
+    par_dic = {}
+    with open (self.parfile_path) as f:
+      for line in f:
+        if line.startswith("#") or len(line) == 0:
+          continue
+        else:
+          try:
+            key, value = line.strip().split("=")
+            if "#" in value:
+              value = value.split("#")[0].strip()
+            try:
+              float(value)
+            except ValueError:
+              value = value.split("->")[-1]
+            key = key.strip()
+            par_dic[key] = value
+          except:
+            pass
+    self.par_dic = par_dic
+
+    if not par_dic:
+      print(f"  {_style("$", _DIM)} Read parfile and stored the data...")
 
   # ------------ LOG-FILES -------------
   # Locate slurm logfiles.

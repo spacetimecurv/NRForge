@@ -6,17 +6,16 @@
 import nrforge as nrf
 from nrforge.initialdata.elliptica import Elliptica
 from nrforge.utils.eos_utils import load_elliptica_table, calculate_enthalpy_bounds
-from nrforge.initialdata.templates.elliptica_templates import get_elliptica_bhns_user_params_example, \
-                                                              get_iterated_bh_mass
+from nrforge.initialdata.templates.elliptica_templates import get_iterated_bh_mass
 
-#nrf.banner()
+nrf.banner()
 
 # Testing the utility (mode 'analyze').
-#elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00',
-#                      mode='analyze', logs_path=None, print_info=False, user_params=None)
+elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00',
+                      mode='analyze', logs_path=None, print_info=False, user_params=None)
 
-#elliptica.initial_data_progress(print_timing=True)
-#elliptica.convergence(plot=False, save=False)
+elliptica.initial_data_progress(print_timing=True)
+elliptica.convergence(plot=False, save=False)
 
 # Testing the utility (mode 'create').
 mass = get_iterated_bh_mass(mass=4.3, sequence=[50, 50, 50, 20], gap=0.5)
@@ -42,4 +41,4 @@ user_params = {
 elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/test',
                       mode='create', logs_path=None, print_info=False, user_params=user_params, system='BHNS')
 elliptica.write_bashfile(bashname="BHNS.slurm", cluster="ARA", id_exe="/home/no96soq/Elliptica/Exe/elliptica")
-#elliptica.submit_job()
+elliptica.submit_job()
