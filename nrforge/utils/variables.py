@@ -6,7 +6,7 @@
 import numpy as np
 
 # NRForge stuff.
-from nrforge.utils.constants import Msun_sec
+from nrforge.utils.constants import *
 
 # ------------ Binary parameters --------------
 # Here we collect a couple of useful
@@ -305,3 +305,36 @@ def get_id_gw_frequency_Hz_22(omega: float, mtot: float) -> float:
   Initial gravitational wave frequency of the 22-mode.
   """
   return 2 * mtot * omega
+
+# -------------- Simulation parameters ---------------
+# Here we collect a couple of parameters related to
+# simulations.
+def get_km_from_solar_masses(Msolar: float) -> float:
+  """
+  Convert a length given in solar masses to km.
+
+  Parameters:
+  Msolar (float): solar masses (code units).
+
+  Returns:
+  Length in kilometer.
+  """
+  M    = Msolar * Msun_SI
+  M_km = G_SI * M / c_SI**2 / 1e3
+
+  return M_km
+
+def get_ms_from_solar_masses(Msolar: float) -> float:
+  """
+  Convert time given in solar masses to ms.
+
+  Parameters:
+  Msolar (float): solar masses (code units).
+
+  Returns:
+  Time in milliseconds.
+  """
+  M    = Msolar * Msun_SI
+  M_ms = G_SI * M / c_SI**3 * 1e3
+
+  return M_ms
