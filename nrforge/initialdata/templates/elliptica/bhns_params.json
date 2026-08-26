@@ -1,0 +1,16 @@
+{
+  "project"            : "BH_NS_binary_initial_data",
+  "separation"         : 40,
+  "bh_irreducible_mass": 4.3,
+  "bh_chix"            : 0.0,
+  "bh_chiy"            : 0.0,
+  "bh_chiz"            : 0.75,
+  "ns_baryonic_mass"   : 1.6,
+  "ns_eos_name"        : "DD2",
+  "eos_table_path"     : "/path/to/eos.txt",
+  "ns_h_floor"         : 1.003,
+  "ns_h_ceil"          : 4,
+  "ns_omegax"          : 0.0,
+  "ns_omegay"          : 0.0,
+  "ns_omegaz"          : 0.0
+}

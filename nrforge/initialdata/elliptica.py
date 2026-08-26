@@ -17,9 +17,10 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from jinja2 import Environment, FileSystemLoader
+from pathlib import Path
 
 # NRForge libraries.
-from .templates.elliptica_templates import get_elliptica_bhns_template
 from ..utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
 
 # ANSI styles used to decorate terminal reports.
@@ -40,6 +41,31 @@ def _fmt(sec):
   h, r = divmod(r, 3600)
   m, s = divmod(r, 60)
   return (f"{d}d " if d else "") + f"{h}h {m}m"
+
+# Get a iterated BH mass.
+def get_iterated_bh_mass(mass: float, sequence: list, gap: float) -> str:
+  """
+  Computes an iterated mass string for a Elliptica parfile
+  that gives more stability for the convergence.
+
+  Parameters:
+  mass    (float): target mass that will be iterated to.
+  sequence (list): list with the iterations per iterated mass.
+  gap     (float): gap between iterated masses.
+
+  Returns:
+  String holding the iteration sequence to the target mass.
+  """
+  string = ""
+  length = len(sequence)
+
+  for i, iter in enumerate(sequence):
+    string += str((mass + ((length-i)*gap)))
+    string += f"(x{sequence[i]})"
+    string += f"->"
+
+  string += str(mass)
+  return string
 
 #--------------- ELLIPTICA ID SOLVER ----------------
 class Elliptica:
@@ -146,104 +172,28 @@ class Elliptica:
     Parameters:
     path (str): path to where the parameter file should be written.
     """
-    # Parfile write function.
-    def write_parfile(path, params):
-      """
-      Writes the parameter file in a nice format.
-
-      Parameters:
-      path    (str): path to the parameter file.
-      params (dict): the template filled parameter dict.
-      """
-      with open(path, 'w') as f:
-        f.write(f"#{40 * '-'}#\n")
-        f.write("# Physics:\n")
-        f.write(f"#{40 * '-'}#\n")
-        for key, value in params.items():
-          # Write the section header preceding this parameter, if any.
-          if key == "Project":
-            f.write("\n#### Project:\n")
-          elif "_separation" in key:
-            f.write("\n#### Binary parameters:\n")
-          elif "_irreducible_mass" in key:
-            f.write("\n#### BH:\n")
-          elif "_baryonic_mass" in key:
-            f.write("\n#### NS:\n")
-          elif key == "SYS_initialize":
-            f.write("\n#### system:\n")
-          elif key == "Free_data_conformal_metric":
-            f.write("\n#### free data:\n")
-          elif key == "ADM_constraints_method":
-            f.write("\n#### ADM:\n")
-          elif key == "checkpoint_every":
-            f.write(f"\n#{40 * '-'}#\n")
-            f.write("# Settings:\n")
-            f.write(f"#{40 * '-'}#\n")
-            f.write("\n#### checkpoint:\n")
-          elif key == "Derivative_Method":
-            f.write("\n#### basics:\n")
-          elif key == "grid_kind":
-            f.write(f"\n#{40 * '-'}#\n")
-            f.write("# Grid and Geometry:\n")
-            f.write(f"#{40 * '-'}#\n")
-            f.write("\n#### grid:\n")
-          elif key == "n_a":
-            f.write("\n#### resolutions:\n")
-          elif key == "Eq_type":
-            f.write(f"\n#{40 * '-'}#\n")
-            f.write("# Equations and Solve:\n")
-            f.write(f"#{40 * '-'}#\n")
-            f.write("\n#### what and where to solve:\n")
-          elif key == "solve_Order":
-            f.write("\n#### solve settings:\n")
-          elif key == "txt_output_0d":
-            f.write(f"\n#{40 * '-'}#\n")
-            f.write("# Print:\n")
-            f.write(f"#{40 * '-'}#\n")
-            f.write("\n#### outputs:\n")
-
-          # Write the parameter itself.
-          f.write("%s = %s\n" % (key, value))
-
-    # Fill the template.
+    # Create the directory.
     params = self.user_params
-    PARDIC = {}
-    if self.system == 'BHNS':
-      PARDIC = get_elliptica_bhns_template()
-      PARDIC['BHNS_separation']         = params['binary_separation']
-      PARDIC['BH_chi_x']                = params['bh_chi_x']
-      PARDIC['BH_chi_y']                = params['bh_chi_y']
-      PARDIC['BH_chi_z']                = params['bh_chi_z']
-      PARDIC['BH_irreducible_mass']     = params['bh_mass']
-      PARDIC['NS_baryonic_mass']        = params['ns_mass']
-      PARDIC['NS_EoS_description']      = params['ns_eos_name']
-      PARDIC['NS_EoS_unit']             = params['ns_units']
-      PARDIC['NS_EoS_table_path']       = params['ns_eos_table_path']
-      PARDIC['NS_EoS_table_format']     = params['ns_eos_table_format']
-      PARDIC['NS_EoS_enthalpy_floor']   = params['ns_eos_enth_floor']
-      PARDIC['NS_EoS_enthalpy_ceiling'] = params['ns_eos_enth_ceil']
-      PARDIC['NS_Omega_x']              = params['ns_omega_x']
-      PARDIC['NS_Omega_y']              = params['ns_omega_y']
-      PARDIC['NS_Omega_z']              = params['ns_omega_z']
-
-    # Write the parameter file.
-    obj1, obj2 = PARDIC["Project"].split("_")[0], \
-                 PARDIC["Project"].split("_")[1]
+    BASE_DIR = Path(__file__).resolve().parent
+    TEMPLATE_DIR = BASE_DIR / "templates" / "elliptica"
+    obj1, obj2 = params["project"].split("_")[0], \
+                 params["project"].split("_")[1]
     m1, m2     = 0.0, 0.0
     if self.system == 'BHNS':
-      if "->" in PARDIC['BH_irreducible_mass']: # iterated mass
-        m1     = float(PARDIC['BH_irreducible_mass'].split("->")[-1])
+      template_name = "elliptica_bhns.in.j2"
+      if "->" in str(params['bh_irreducible_mass']): # iterated mass
+        m1     = float(params['bh_irreducible_mass'].split("->")[-1])
       else:
-        m1     = float(PARDIC['BH_irreducible_mass'])
-      m2       = float(PARDIC['NS_baryonic_mass'])
-      s1       = np.sqrt(float(PARDIC['BH_chi_x'])**2 + float(PARDIC['BH_chi_y'])**2 \
-                         + float(PARDIC['BH_chi_z'])**2)
-      s2       = np.sqrt(float(PARDIC['NS_Omega_x'])**2 + float(PARDIC['NS_Omega_y'])**2 \
-                               + float(PARDIC['NS_Omega_z'])**2)
-      sep      = PARDIC['BHNS_separation']
-      self.simname = PARDIC['NS_EoS_description'] + f"_M{obj1}-" + str(round(m1,1)) + f"_s{obj1}-" \
-                     + str(round(s1,2)) + f"--M{obj2}-" + str(round(m2,2)) + f"_s{obj2}-" + str(round(s2,2)) \
-                     + "--d" + str(sep)
+        m1     = float(params['bh_irreducible_mass'])
+      m2       = float(params['ns_baryonic_mass'])
+      s1       = np.sqrt(float(params['bh_chix'])**2 + float(params['bh_chiy'])**2 \
+                        + float(params['bh_chiz'])**2)
+      s2       = np.sqrt(float(params['ns_omegax'])**2 + float(params['ns_omegay'])**2 \
+                              + float(params['ns_omegaz'])**2)
+      sep      = params['separation']
+      self.simname = params['ns_eos_name'] + f"_M{obj1}-" + str(round(m1,1)) + f"_s{obj1}-" \
+                    + str(round(s1,2)) + f"--M{obj2}-" + str(round(m2,2)) + f"_s{obj2}-" + str(round(s2,2)) \
+                    + "--d" + str(sep)
       self.path    = os.path.join(path, self.simname)
       try:
         os.mkdir(self.path)
@@ -251,10 +201,16 @@ class Elliptica:
       except FileExistsError:
         print(f"  {_style("$", _DIM)} Directory exists already under {_style(self.path, _CYAN)}")
 
-      # Write the parfile.
-      simpath = os.path.join(self.path, self.simname+".par")
-      write_parfile(simpath, PARDIC)
-      print(f"  {_style("$", _DIM)} Parfile written to {_style(simpath, _CYAN)}")
+    # Write the parfile.
+    simpath = os.path.join(self.path, self.simname+".par")
+    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    template = env.get_template(template_name)
+    rendered = template.render(**params)
+
+    # Write the parameter file.
+    with open(simpath, "w") as f:
+      f.write(rendered)
+    print(f"  {_style("$", _DIM)} Parfile written to {_style(simpath, _CYAN)}")
 
   # Write a slurm script.
   def write_bashfile(self, bashname, cluster, id_exe):
