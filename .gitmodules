@@ -1,0 +1,6 @@
+[submodule "external/EOSympOSE"]
+	path = external/EOSympOSE
+	url = ../../spacetimecurv/EOSympOSE.git
+[submodule "external/batchtools"]
+	path = external/batchtools
+	url = ../../computationalrelativity/batchtools.git

@@ -4,12 +4,38 @@ A lightweight tool to generate initial data for various systems and solvers and 
 ## Installation
 
 ```bash
-git clone https://github.com/spacetimecurv/NRForge.git
+git clone --recurse-submodules https://github.com/spacetimecurv/NRForge.git
 cd NRForge
-pip install -e .        # editable: edits to the source are picked up immediately
+pip install -e .
 ```
 
 This makes `nrforge` importable from anywhere in that environment.
+
+## Submodules
+
+Two external tools live under `external/` as git submodules:
+
+| Submodule | Contents |
+| --- | --- |
+| `external/EOSympOSE` | fetches CompOSE equations of state and converts them for NR codes and initial data solvers (wraps `PyCompOSE`, a nested submodule) |
+| `external/batchtools` | sets up and manages simulation directories and batch scripts on HPC clusters |
+
+Neither is needed to import `nrforge`, but the EOS tables and batch scripts they
+produce feed the pipelines above. If the repository is already checked out, or the nested
+`PyCompOSE` is missing, pull them in afterwards:
+
+```bash
+git submodule update --init --recursive
+```
+
+Installing the EOS tools alongside `nrforge` is then a single call:
+
+```bash
+pip install -e . -e external/EOSympOSE/external/PyCompOSE -e external/EOSympOSE
+```
+
+Both repositories document themselves in `external/EOSympOSE/README.md` and
+`external/batchtools/README.md`.
 
 ## Usage
 

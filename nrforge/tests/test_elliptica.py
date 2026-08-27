@@ -6,11 +6,8 @@
 import json
 
 # Import the Elliptica class.
-import nrforge as nrf
-from nrforge.initialdata.elliptica import Elliptica, get_iterated_bh_mass
-from nrforge.utils.eos_utils import load_elliptica_table, calculate_enthalpy_bounds
-
-nrf.banner()
+from ..initialdata.elliptica import Elliptica, get_iterated_bh_mass
+from ..utils.eos_utils import load_elliptica_table, calculate_enthalpy_bounds
 
 # Testing the utility (mode 'analyze').
 elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00',
