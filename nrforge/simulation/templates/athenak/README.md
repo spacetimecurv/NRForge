@@ -47,9 +47,9 @@ For writing the AthenaK parfile, we can run
 
 ```python
 import json
-from nrforge.evolution.evolution import Evolution
+from nrforge.simulation.evolution import Evolution
 
-with open("../evolution/templates/athenak/bhns/configs/athenak_bhns_vlr.json", "r") as f:
+with open("../simulation/templates/athenak/bhns/configs/athenak_bhns_vlr.json", "r") as f:
   params = json.load(f)
 
 evolution = Evolution("AthenaK", "Elliptica", "BHNS")
@@ -106,11 +106,11 @@ This will take the path to the initial data we just created, create a run direct
 - `waveform_radius_spacing` - spacing between waveform surfaces
 - `waveform_dt` - how frequent to write the wave output
 
-For different resolutions, the user can find templates for the parameter file (the trimmed ones assuming one has used the Elliptica initialdata pipeline of NRForge) under `evolution/templates/athenak/bhns/elliptica/configs`. A full template with all the parameters can also be found. The supported resolutions are:
+For different resolutions, the user can find templates for the parameter file (the trimmed ones assuming one has used the Elliptica initialdata pipeline of NRForge) under `simulation/templates/athenak/bhns/elliptica/configs`. A full template with all the parameters can also be found. The supported resolutions are:
 
 | File | Resolution |
 | ---- | ---------- |
-| `athenak_bhns_elliptica_lr.json` | 370m |
+| `athenak_bhns_elliptica_vlr.json` | 370m |
 | `athenak_bhns_elliptica_mr.json` | 240m |
 | `athenak_bhns_elliptica_sr.json` | 180m |
 | `athenak_bhns_elliptica_hr.json` | 90m |

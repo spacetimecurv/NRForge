@@ -70,7 +70,7 @@ class Evolution:
       )
 
     # Print diagnostics.
-    code_string = f"System: {system}"
+    code_string = f"Code: {code}"
     id_solver_string = f"ID solver: {id_solver}"
     system_string = f"System: {system}"
     width = max([len(code_string) + 2,

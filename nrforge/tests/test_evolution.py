@@ -6,9 +6,9 @@
 import json
 
 # Import NRForge utility.
-from nrforge.evolution.evolution import Evolution
+from nrforge.simulation.evolution import Evolution
 
-with open("../evolution/templates/athenak/bhns/elliptica/configs/athenak_bhns_elliptica_vlr.json", "r") as f:
+with open("../simulation/templates/athenak/bhns/elliptica/configs/athenak_bhns_elliptica_vlr.json", "r") as f:
   params = json.load(f)
 
 # TODO: interface batchtools for the batch scripts. Add cluster as an option. Set path to the initial data in the

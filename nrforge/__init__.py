@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from . import utils, initialdata
+from . import utils, initialdata, simulation
 
 try:  # Installed package: read the version from the metadata.
     from importlib.metadata import version as _version
