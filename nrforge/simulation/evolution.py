@@ -5,7 +5,6 @@
 # Built-in libraries.
 import os
 import re
-from collections import defaultdict
 import json
 from enum import StrEnum
 import subprocess
@@ -17,9 +16,9 @@ from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 
 # NRForge libraries.
-from ..utils.style import _style, _BOLD, _DIM, _CYAN
-from ..utils.eos_utils import get_athtab_bounds, load_athtab_header
-from ..utils.constants import *
+from nrforge.utils.style import _style, _BOLD, _DIM, _CYAN
+from nrforge.utils.eos_utils import get_athtab_bounds, load_athtab_header
+from nrforge.utils.constants import *
 
 class EvolutionCode(StrEnum):
   ATHENAK = "AthenaK"
@@ -255,5 +254,34 @@ class Evolution:
 
         print(f"  {_style("$", _DIM)} Wrote parfile to {_style(self.evo_parfile_path, _CYAN)}")
 
+  # Select a batch script from batchtools.
+  def select_batchtools_template(self, cluster: str):
+    """
+    Selects the batchtools template for the specified cluster and add's it
+    to the run directory, where the parameterfile has been written.
 
+    Parameters:
+    cluster (str): name of the cluster (needs to match batchtools).
+    """
+    # Functionality currently only supported with AthenaK.
+    if self.code == EvolutionCode.ATHENAK:
+      subs      = Path(__file__).resolve().parents[2] / "external" / "batchtools" / "templates" / "athenak"
+      signature = ".sub"
+      clusters  = os.listdir(subs)
+      if cluster not in clusters:
+        raise SystemExit(f"Supported clusters are: {clusters}")
+
+      self.batch_path = None
+      for file in os.listdir(subs / cluster):
+        if file.endswith(signature):
+          self.batch_path = os.path.join(self.ev_path, file)
+          subprocess.run(['cp', subs / cluster / file, self.ev_path])
+          break
+
+      if self.batch_path is None:
+        raise SystemExit(f"Could not find batch file with signature .sub in {subs / cluster}!")
+      else:
+        print(f"  {_style("$", _DIM)} Copied batchtools template for {_style(cluster, _DIM)} to {_style(self.batch_path, _CYAN)}")
+    else:
+      raise SystemExit("Batchtools templates currently only available for AthenaK!")
 

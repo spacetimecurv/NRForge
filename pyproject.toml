@@ -16,6 +16,7 @@ dependencies = [
   "numpy >= 1.23.1",
   "scipy >= 1.10.0",
   "matplotlib >= 3.5.3",
+  "jinja2 >= 3.1.5"
 ]
 
 [project.urls]
@@ -27,7 +28,5 @@ where = ["."]
 include = ["nrforge*"]
 exclude = ["nrforge.tests*"]
 
-# Ship non-Python template files (parfile snippets, slurm scripts, ...)
-# that live next to the template modules.
 [tool.setuptools.package-data]
-"nrforge.initialdata.templates" = ["*.par", "*.sh", "*.txt"]
+"*" = ["*.j2", "*.json", "*.par", "*.sh", "*.txt"]

@@ -21,8 +21,8 @@ from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 
 # NRForge libraries.
-from ..utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
-from ..utils.style import _style, _fmt, _BOLD, _DIM, _CYAN
+from nrforge.utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
+from nrforge.utils.style import _style, _fmt, _BOLD, _DIM, _CYAN
 
 # Get a iterated BH mass.
 def get_iterated_bh_mass(mass: float, sequence: list, gap: float) -> str:
