@@ -1,5 +1,5 @@
 ####################################################
-#         Classes for Elliptica ID solver          #
+#          Class for Elliptica ID solver           #
 ####################################################
 
 # Built-in libraries.
@@ -22,25 +22,7 @@ from pathlib import Path
 
 # NRForge libraries.
 from ..utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
-
-# ANSI styles used to decorate terminal reports.
-_BOLD = '1'
-_DIM = '2'
-_CYAN = '36'
-
-def _style(text, *codes):
-  """Wrap text in ANSI escape codes, unless the output does not support them."""
-  if not sys.stdout.isatty() or os.environ.get('NO_COLOR'):
-    return text
-  return f'\033[{";".join(codes)}m{text}\033[0m'
-
-# Timing format.
-def _fmt(sec):
-  sec = int(round(sec))
-  d, r = divmod(sec, 86400)
-  h, r = divmod(r, 3600)
-  m, s = divmod(r, 60)
-  return (f"{d}d " if d else "") + f"{h}h {m}m"
+from ..utils.style import _style, _fmt, _BOLD, _DIM, _CYAN
 
 # Get a iterated BH mass.
 def get_iterated_bh_mass(mass: float, sequence: list, gap: float) -> str:
@@ -141,6 +123,7 @@ class Elliptica:
       print(f"  {_style("$", _DIM)} Remaining time (estimated): {_fmt(self.initial_data_progress(print_timing=False))}")
       self.convergence(plot=True, save=True) # plot convergence
       self.write_metadata()           # write metadata about the binary
+      self.move_data()                # move the data to the parent directory
 
     # If in create mode, create a parfile under
     # the specified path passing user parameters with the
@@ -162,6 +145,21 @@ class Elliptica:
       # Make the parfile.
       print(_style("Creating initial data setup...", _BOLD))
       self.make_parfile(path)
+
+  # ------------ MOVER --------------
+  # Move the data to the parent folder, once done.
+  def move_data(self):
+    """
+    Moves the data from the highest resolution directory to
+    the parent directory.
+    """
+    if self.status == 'Done':
+      keys    = list(self.resolutions.keys())
+      hr_path = self.resolutions[keys[-1]]
+      subprocess.run(['cp', os.path.join(hr_path, "checkpoint.dat"), self.parent_path])
+      subprocess.run(['cp', os.path.join(hr_path, f"{self.system}_properties.txt"), self.parent_path])
+
+      print(f"  {_style("$", _DIM)} Copied the highest-resolution results to the parent folder...")
 
   # ------------ WRITER -------------
   # Create a parfile from the template.

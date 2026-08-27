@@ -190,3 +190,124 @@ def calculate_enthalpy_bounds(rows: list, margin: float, ceil_trim: int, print_i
 
   return (a['rec_floor'], a['rec_ceil'])
 
+
+# ------------ ATHENAK 3D EOS TABLES -------------
+# Load 3D EOS table header in AthenaK format.
+_ATHTAB_DENSITY_KEYS     = ("nb", "n", "nn", "rho")
+_ATHTAB_TEMPERATURE_KEYS = ("t", "nt", "temp")
+
+def load_athtab_header(path: str) -> tuple:
+  """
+  Parse the ASCII header of an AthenaK .athtab table.
+
+  Parameters:
+  path (str): path to the .athtab table.
+
+  Returns:
+  Tuple of (metadata, scalars, points, fields, offset), where
+  metadata (dict) holds version, endianness and precision as
+  strings, scalars (dict) the named scalars (e.g. mn, mp) as
+  floats, points (dict) the axis name -> number of points in
+  blob order, fields (list) the field names in blob order, and
+  offset (int) the byte offset at which the binary blob starts.
+  """
+  metadata, scalars, points, fields = {}, {}, {}, []
+  section = None
+
+  with open(path, "rb") as fh:
+    while True:
+      raw = fh.readline()
+      if not raw:
+        raise SystemExit(f"Reached EOF before <fieldsend> in {path} - not an .athtab table?")
+      try:
+        line = raw.decode().strip()
+      except UnicodeDecodeError:
+        raise SystemExit(f"Hit binary data before <fieldsend> in {path} - malformed header?")
+      if not line:
+        continue
+
+      # Section markers, e.g. <pointsbegin> ... <pointsend>.
+      if line[0] == "<" and line[-1] == ">":
+        if line == "<fieldsend>":
+          break
+        section = line[1:-1].removesuffix("begin") if line.endswith("begin>") else None
+        continue
+
+      if section == "fields":
+        fields.append(line)
+      elif "=" in line:
+        key, value = (s.strip() for s in line.split("=", 1))
+        try:
+          if section == "metadata":
+            metadata[key] = value
+          elif section == "scalars":
+            scalars[key] = float(value)
+          elif section == "points":
+            points[key] = int(value)
+        except ValueError:
+          raise SystemExit(f"Malformed {section} entry '{key}={value}' in the header of {path}.")
+
+    offset = fh.tell()
+
+  if not points:
+    raise SystemExit(f"No axes listed in the header of {path}.")
+
+  return (metadata, scalars, points, fields, offset)
+
+def get_athtab_bounds(path: str, print_info: bool = False) -> tuple:
+  """
+  Read the density and temperature bounds of a 3D AthenaK
+  equation-of-state table.
+
+  Parameters:
+  path (str): path to the .athtab table.
+  print_info (bool): print the axes and their bounds.
+
+  Returns:
+  Tuple of ((n_min, n_max), (T_min, T_max)) in the units of the
+  table itself, usually fm^-3 for the density and MeV for the
+  temperature (CompOSE).
+  """
+  metadata, _, points, _, offset = load_athtab_header(path)
+
+  dtype = np.dtype(np.float64 if metadata.get("precision") == "double" else np.float32)
+  endianness = metadata.get("endianness", "")
+  if endianness == "little":
+    dtype = dtype.newbyteorder("<")
+  elif endianness == "big":
+    dtype = dtype.newbyteorder(">")
+  else:
+    dtype = dtype.newbyteorder("=")
+
+  # The axes sit back to back at the head of the blob, ahead of the fields.
+  axes = {}
+  with open(path, "rb") as fh:
+    fh.seek(offset)
+    for key, npoints in points.items():
+      axis = np.fromfile(fh, dtype=dtype, count=npoints)
+      if axis.size != npoints:
+        raise SystemExit(f"Table {path} is truncated: axis '{key}' is short "
+                         f"({axis.size} of {npoints} points).")
+      axes[key] = axis
+
+  def find_axis(names):
+    return next((key for key in axes if key.lower() in names), None)
+
+  n_key = find_axis(_ATHTAB_DENSITY_KEYS)
+  T_key = find_axis(_ATHTAB_TEMPERATURE_KEYS)
+  if n_key is None or T_key is None:
+    raise SystemExit(f"Could not identify the density and/or temperature axis "
+                     f"in {path} (found axes {list(axes)}).")
+
+  n_bounds = (float(axes[n_key].min()), float(axes[n_key].max()))
+  T_bounds = (float(axes[T_key].min()), float(axes[T_key].max()))
+
+  if print_info:
+    print("=" * 70)
+    print(f"AthenaK table: {path}")
+    print("=" * 70)
+    print("Axes: " + ", ".join(f"{k} ({v} points)" for k, v in points.items()))
+    print(f"   {n_bounds[0]:.6e} <= {n_key} <= {n_bounds[1]:.6e}")
+    print(f"   {T_bounds[0]:.6e} <= {T_key} <= {T_bounds[1]:.6e}")
+
+  return (n_bounds, T_bounds)

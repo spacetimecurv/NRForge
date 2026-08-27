@@ -13,11 +13,11 @@ from nrforge.utils.eos_utils import load_elliptica_table, calculate_enthalpy_bou
 nrf.banner()
 
 # Testing the utility (mode 'analyze').
-#elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00',
-#                      mode='analyze', logs_path=None, print_info=False, user_params=None)
+elliptica = Elliptica(path='/home/no96soq/athenak/runs/PhysicsComparisonBHNS/ID/BHNS_DD2_BH_m4.3-NS_m1.6_s0.75-d40_22x22x22_00',
+                     mode='analyze', logs_path=None, print_info=False, user_params=None)
 
-#elliptica.initial_data_progress(print_timing=True)
-#elliptica.convergence(plot=False, save=False)
+elliptica.initial_data_progress(print_timing=True)
+elliptica.convergence(plot=False, save=False)
 
 # Testing the utility (mode 'create').
 mass = get_iterated_bh_mass(mass=4.3, sequence=[50, 50, 50, 20], gap=0.5)

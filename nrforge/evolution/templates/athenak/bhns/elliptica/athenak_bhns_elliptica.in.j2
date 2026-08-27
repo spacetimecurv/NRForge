@@ -1,0 +1,585 @@
+# AthenaK input file for mixed binaries.
+
+<job>
+basename = bhns
+
+# =======================================================
+# Mesh structure
+# =======================================================
+<mesh>
+nghost    = 4         # Number of ghost cells
+nx1       = {{ nx1 }}       # Number of zones in X1-direction
+x1min     = {{ domain_minus }}   # minimum value of X1
+x1max     = {{ domain_plus }}    # maximum value of X1
+ix1_bc    = {{ boundary_condition }}    # inner-X1 boundary flag
+ox1_bc    = {{ boundary_condition }}    # outer-X1 boundary flag
+
+nx2       = {{ nx2 }}       # Number of zones in X2-direction
+x2min     = {{ domain_minus }}   # minimum value of X2
+x2max     = {{ domain_plus }}    # maximum value of X2
+ix2_bc    = {{ boundary_condition }}    # inner-X2 boundary flag
+ox2_bc    = {{ boundary_condition }}    # outer-X2 boundary flag
+
+nx3       = {{ nx3 }}       # Number of zones in X3-direction
+x3min     = {{ domain_minus }}   # minimum value of X3
+x3max     = {{ domain_plus }}    # maximum value of X3
+ix3_bc    = {{ boundary_condition }}    # inner-X3 boundary flag
+ox3_bc    = {{ boundary_condition }}    # outer-X3 boundary flag
+
+<meshblock>
+nx1       = {{ nx1_block }}        # Number of cells in each MeshBlock, X1-dir
+nx2       = {{ nx2_block }}        # Number of cells in each MeshBlock, X2-dir
+nx3       = {{ nx3_block }}        # Number of cells in each MeshBlock, X3-dir
+
+# =======================================================
+# Mesh refinement
+# =======================================================
+<mesh_refinement>
+refinement          = adaptive
+max_nmb_per_rank    = {{ max_nmb_per_rank }}
+num_levels          = {{ num_levels }}
+refinement_interval = 1
+
+<z4c_amr>
+method = tracker
+
+<amr_criterion0>
+method = user
+
+<refined_region1>
+level = {{ ref1_level }}
+x1min = {{ ref1_x1min }}
+x1max = {{ ref1_x1max }}
+x2min = {{ ref1_x2min }}
+x2max = {{ ref1_x2max }}
+x3min = {{ ref1_x3min }}
+x3max = {{ ref1_x3max }}
+
+<refined_region2>
+level = {{ ref2_level }}
+x1min = {{ ref2_x1min }}
+x1max = {{ ref2_x1max }}
+x2min = {{ ref2_x2min }}
+x2max = {{ ref2_x2max }}
+x3min = {{ ref2_x3min }}
+x3max = {{ ref2_x3max }}
+
+# =======================================================
+# Time integrator
+# =======================================================
+<time>
+evolution  = dynamic    # dynamic/kinematic/static
+integrator = rk3        # time integration algorithm
+cfl_number = {{ cfl }}       # Courant, Friedrichs, & Lewy (CFL) Number
+nlim	     = -1		      # cycle limit
+tlim       = {{ tlim }}    # time limit
+ndiag      = {{ ndiag }}		      # cycles between diagnostic output
+
+# =======================================================
+# Coordinates and excision
+# =======================================================
+<coord>
+general_rel     = true
+minkowski       = false
+a               = {{ spin }}
+
+# Excision
+excise          = true
+excision_scheme = horizon
+horizon_factor  = {{ horizon_factor }}
+{%- if smooth_excision %}
+smooth_excision = true
+tdamp           = {{ tdamp }}
+{%- endif %}
+dexcise         = {{ dfloor }}
+texcise         = {{ tfloor }}
+
+# EMF flux correction
+excision_flux_emf = false
+
+# Freeze excision
+freeze_excision        = false
+freeze_excision_radius = true
+freeze_excision_center = false
+
+# =======================================================
+# GRMHD evolution
+# =======================================================
+<mhd>
+eos             = ideal       # UNUSED, BUT NEEDED
+gamma           = 2.0         # UNUSED, BUT NEEDED
+
+# CompOSE equation of state with floor policy
+dyn_eos         = compose     # PrimitiveSolver EOSPolicy
+dyn_error       = reset_floor # PrimitiveSolver ErrorPolicy
+
+table           = {{ table_path_3D }}
+{%- if NQT %}
+use_NQT         = true
+{%- else %}
+use_NQT         = false
+{%- endif %}
+nscalars        = 1
+
+# Riemann solver and reconstruction scheme
+reconstruct     = {{ reconstruction }}       # spatial reconstruction method
+rsolver         = {{ riemann }}        # Riemann solver to be used
+
+# FOFC
+enforce_maximum = false
+dmp_M		        = 1.2         # threshold multiplier for fofc (DEFAULT)
+fofc            = true        # first order flux correction
+
+# Floors and brackets
+dfloor          = {{ dfloor }}       # floor on density rho
+tfloor          = {{ tfloor }}	        # floor on temperature (MeV)
+s0_atmosphere   = 0.5         # electron fraction atmosphere (DEFAULT)
+dthreshold      = 1.0	        # threshold factor for density floor (DEFAULT)
+dyn_scratch     = 0           # GPU scratch level for flux and source calculations (DEFAULT)
+c2p_tol         = 2.49e-13    # root finder threshold limit
+gamma_max       = 20.025      # ceiling Lorentz factor
+
+# =======================================================
+# Z4c evolution
+# =======================================================
+<z4c>
+# Gauge parameters (lapse)
+lapse_oplog     = 2.0 # 1+log lapse parameter (DEFAULT)
+lapse_harmonicf = 1.0 # (DEFAULT)
+lapse_harmonic  = 0.0 # Harmonic lapse parameter mu_L (DEFAULT)
+lapse_advect    = 1.0 # (DEFAULT)
+
+# Gauge parameters (shift)
+shift_Gamma	    = 1.0               # (DEFAULT)
+shift_advect    = 1.0               # (DEFAULT)
+shift_eta       = {{ z4c_eta }}        # Shift damping term (2/Mtot)
+shift_zero	    = true		          # Set the initial shift to zero (option: donothing)
+
+# Dissipation parameters
+diss            = {{ KO_diss }}               # Kreiss-Oliger dissipation parameter
+chi_div_floor   = 1e-05		          # (DEFAULT)
+
+# Constraint damping
+damp_kappa1     = 0.02              # Constraint damping factor 1
+damp_kappa2     = 0.00              # Constraint damping factor 2 (DEFAULT)
+
+# Wave extraction
+nrad_wave_extraction = {{ nrad_wave_extraction }}
+{% for i in range(nrad_wave_extraction) -%}
+extraction_radius_{{ i }} = {{ (i + 1) * waveform_radius_spacing }}
+{% endfor -%}
+waveform_dt = {{ waveform_dt }}
+
+# Compact Object Tracker
+nco                  = 2
+co_0_type            = BH
+co_0_x               = {{ co0_x }}
+co_0_y               = {{ co0_y }}
+co_0_z               = {{ co0_z }}
+co_0_mass            = {{ co0_mass }}   # needed for fastflow finder
+co_0_radius          = {{ co0_radius }}   # volume of the tracker AMR
+co_0_reflevel        = {{ ref1_level }}     # requested minimum refinement level
+co_1_type            = NS
+co_1_x               = {{ co1_x }}
+co_1_y               = {{ co1_y }}
+co_1_z               = {{ co1_z }}
+co_1_mass            = {{ co1_mass }}
+co_1_radius          = {{ co1_radius }}   # volume of the tracker AMR
+co_1_reflevel	       = {{ ref2_level }}     # requested minimum refinement level
+
+# =======================================================
+# ADM
+# =======================================================
+<adm>
+
+# =======================================================
+# Fastflow horizon finder
+# =======================================================
+<fastflow>
+# Number of punctures and horizons
+npunct             = 1
+num_horizons       = 1
+
+# Grid points
+ntheta             = 10
+lmax               = 8
+
+# Puncture 0
+use_puncture_0     = 0
+center_x_0         = 0.0
+center_y_0         = 13.48397047
+center_z_0         = 0.0
+hmean_tol_0        = 300.0
+mass_tol_0         = 1e-4
+
+start_time_0       = 0.0
+stop_time_0        = {{ tlim }}
+
+# AHF output
+output_ylm         = false
+output_grid        = false
+verbose            = true
+
+# =======================================================
+# M1 neutrino transport
+# =======================================================
+<radiation_m1>
+# Matter-Radiation coupling
+gr_sources      = true # (DEFAULT)
+matter_sources  = true # (DEFAULT)
+backreact       = true # (DEFAULT)
+backreact_tmunu = true # (DEFAULT)
+
+# Closure
+theta_limiter          = true    # DEFAULT: false
+closure_epsilon        = 1e-5    # (DEFAULT)
+closure_maxiter        = 64      # (DEFAULT)
+closure_fun            = minerbo # (DEFAULT)
+closure_solver         = brent   # (DEFAULT)
+
+# Floors
+rad_N_floor = {{ rad_N_floor }}
+rad_E_floor = {{ rad_E_floor }}
+
+# Sources
+rad_eps            = 1e-14    # (DEFAULT)
+source_epsabs      = 1e-15    # (DEFAULT)
+source_epsrel      = 1e-5     # (DEFAULT)
+source_maxiter     = 64       # (DEFAULT)
+source_Ye_min      = 0.0      # (DEFAULT)
+source_Ye_max      = 0.6      # (DEFAULT)
+source_thick_limit = 20.0     # (DEFAULT)
+source_therm_limit = -1.0     # (DEFAULT)
+source_scat_limit  = -1.0     # (DEFAULT)
+minmod_theta       = 1        # (DEFAULT)
+source_limiter     = 0.5      # (DEFAULT)
+beam_sources       = false    # (DEFAULT)
+src_update         = implicit # (DEFAULT)
+
+# Opacities
+opacity_type = bns-nurates # DEFAULT: none
+
+# =======================================================
+# BNS_nurates opacity library (online)
+# =======================================================
+<bns_nurates>
+# Parameters
+opacity_tau_trap     = 1.0  # (DEFAULT)
+opacity_tau_delta    = 1.0  # (DEFAULT)
+opacity_corr_fac_max = 3.0  # (DEFAULT)
+nb_min_fm-3          = {{ nb_rad_floor }} # (THC) WeakRates::rho_min_cgs = 1.0e8
+temp_min_mev         = {{ tfloor }}
+
+# Reactions
+use_abs_em          = true  # (DEFAULT)
+use_pair            = true  # (DEFAULT)
+use_brem            = true  # (DEFAULT)
+use_iso             = true  # (DEFAULT)
+use_inelastic_scatt = {{ use_inelastic }}
+use_WM_ab           = true  # (DEFAULT)
+use_WM_sc           = true  # (DEFAULT)
+use_dU              = true  # (DEFAULT)
+use_dm_eff          = false # (DEFAULT)
+
+# Distribution
+{%- if use_equilibrium %}
+use_equilibrium_distribution = true
+{%- else %}
+use_equilibrium_distribution = false
+{%- endif %}
+use_kirchhoff_law            = true  # (DEFAULT)
+use_nonthermal_separated     = true  # (DEFAULT)
+use_NN_medium_corr           = true  # (DEFAULT)
+neglect_blocking             = false # (DEFAULT)
+use_decay                    = true  # (DEFAULT)
+use_BRT_brem                 = false # (DEFAULT)
+
+# =======================================================
+# Problem generator
+# =======================================================
+<problem>
+initial_data_file  = {{ ID_path }}
+initial_data_table = {{ ID_eos_path }}
+table              = {{ ID_eos_evo_path }}
+rho_cut            = 1e-5
+b_max              = {{ bmax }}
+user_hist          = true
+{%- if bfield_type == "current_loop" %}
+bfield_type        = {{ bfield_type }}
+r_0_current        = {{ r0_current }}
+{%- else %}
+bfield_type        = {{ bfield_type }}
+{%- endif %}
+
+# =======================================================
+# Output
+# =======================================================
+# 2D slices
+{%- if enable_2D_output %}
+<output1>
+file_type = bin
+variable  = mhd_w_bcc
+dt        = 30.0
+slice_x3  = 0.0
+id        = mhd_w_bcc_xy
+
+<output2>
+file_type = bin
+variable  = mhd_w_bcc
+dt        = 30.0
+slice_x1  = 0.0
+id        = mhd_w_bcc_yz
+
+<output3>
+file_type = bin
+variable  = z4c
+dt        = 30.0
+slice_x3  = 0.0
+id        = z4c_xy
+
+<output4>
+file_type = bin
+variable  = z4c
+dt        = 30.0
+slice_x1  = 0.0
+id        = z4c_yz
+
+<output5>
+file_type = bin
+variable  = rad_m1_E
+dt        = 30.0
+slice_x3  = 0.0
+id        = rad_m1_E_xy
+
+<output6>
+file_type = bin
+variable  = rad_m1_N
+dt        = 30.0
+slice_x3  = 0.0
+id        = rad_m1_N_xy
+
+<output7>
+file_type = bin
+variable  = rad_m1_E
+dt        = 30.0
+slice_x1  = 0.0
+id        = rad_m1_E_yz
+
+<output8>
+file_type = bin
+variable  = rad_m1_N
+dt        = 30.0
+slice_x1  = 0.0
+id        = rad_m1_N_yz
+{%- endif %}
+
+# History output
+<output9>
+file_type   = hst
+dt          = 1.0
+data_format = %20.15e
+
+# Restart files
+<output10>
+file_type = rst
+dt        = 500.0
+
+# Spherical output (Ejecta/Neutrinos/Tracers)
+{%- if enable_sphere_output %}
+<output11>
+file_type     = sph
+variable      = mhd_w_bcc
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output12>
+file_type     = sph
+variable      = adm
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output13>
+file_type     = sph
+variable      = z4c_alpha
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output14>
+file_type     = sph
+variable      = z4c_betax
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output15>
+file_type     = sph
+variable      = z4c_betay
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output16>
+file_type     = sph
+variable      = z4c_betaz
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output17>
+file_type     = sph
+variable      = rad_m1_N
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output18>
+file_type     = sph
+variable      = rad_m1_E
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+
+<output19>
+file_type     = sph
+variable      = rad_m1_F
+dt            = 20.0
+radii         = 300.0, 400.0
+ntheta        = 256
+theta_spacing = uniform_theta
+{%- endif %}
+
+{%- if enable_tracer_output %}
+<output20>
+file_type       = sph
+variable        = u_t
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+
+<output21>
+file_type       = sph
+variable        = rad_m1_absF
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+
+<output22>
+file_type       = sph
+variable        = rad_m1_e
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+
+<output23>
+file_type       = sph
+variable        = win_Vi
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+
+<output24>
+file_type       = sph
+variable        = mhd_w_d
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+
+<output25>
+file_type       = sph
+variable        = mhd_t
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+
+<output26>
+file_type       = sph
+variable        = mhd_w_s
+dt              = 20.0
+r_min           = 150.0
+r_max           = {{ domain_plus }}
+r_spacing       = log
+nradii          = 128
+ntheta          = 128
+theta_spacing   = uniform_theta
+theta_centering = cell
+{%- endif %}
+
+# 3D output
+{%- if enable_3D_output %}
+<output27>
+file_type = bin
+variable  = mhd_w_bcc
+dt        = 500.0
+id        = mhd_w_bcc_3D
+
+<output28>
+file_type = bin
+variable  = adm
+dt        = 500.0
+id        = adm_3D
+
+<output29>
+file_type = bin
+variable  = z4c_alpha
+dt        = 500.0
+id        = alpha_3D
+
+<output30>
+file_type = bin
+variable  = z4c_betax
+dt        = 500.0
+id        = betax_3D
+
+<output31>
+file_type = bin
+variable  = z4c_betay
+dt        = 500.0
+id        = betay_3D
+
+<output32>
+file_type = bin
+variable  = z4c_betaz
+dt        = 500.0
+id        = betaz_3D
+{%- endif %}
