@@ -11,31 +11,27 @@ pip install -e .
 
 This makes `nrforge` importable from anywhere in that environment.
 
+To also install [EOSympOSE](https://github.com/spacetimecurv/EOSympOSE), which fetches CompOSE
+equations of state and converts them for NR codes and initial data solvers, use the `eos` extra:
+
+```bash
+pip install -e ".[eos]"
+```
+
+This pulls EOSympOSE and PyCompOSE in at pinned commits. It is not needed to import `nrforge`,
+but the EOS tables it produces feed the pipelines below, and the tests import it.
+
 ## Submodules
 
-Two external tools live under `external/` as git submodules:
-
-| Submodule | Contents |
-| --- | --- |
-| `external/EOSympOSE` | fetches CompOSE equations of state and converts them for NR codes and initial data solvers (wraps `PyCompOSE`, a nested submodule) |
-| `external/batchtools` | sets up and manages simulation directories and batch scripts on HPC clusters |
-
-Neither is needed to import `nrforge`, but the EOS tables and batch scripts they
-produce feed the pipelines above. If the repository is already checked out, or the nested
-`PyCompOSE` is missing, pull them in afterwards:
+`external/batchtools` is a git submodule that sets up and manages simulation directories and batch
+scripts on HPC clusters. It is not needed to import `nrforge`. If the repository is already checked
+out without it, pull it in afterwards:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-Installing the EOS tools alongside `nrforge` is then a single call:
-
-```bash
-pip install -e . -e external/EOSympOSE/external/PyCompOSE -e external/EOSympOSE
-```
-
-Both repositories document themselves in `external/EOSympOSE/README.md` and
-`external/batchtools/README.md`.
+It documents itself in `external/batchtools/README.md`.
 
 ## Usage
 
