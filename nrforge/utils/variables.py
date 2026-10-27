@@ -7,6 +7,8 @@ import numpy as np
 
 # NRForge stuff.
 from nrforge.utils.constants import *
+from nrforge.utils.eos_utils import load_compose_h5_cold_slice_code
+from nrforge.utils.numerics import tov_from_baryonic_mass
 
 # ------------ Binary parameters --------------
 # Here we collect a couple of useful
@@ -81,6 +83,109 @@ def christodolou_mass(Mirr, chi):
   Christodolou mass.
   """
   return Mirr * np.sqrt(2 / (1 + np.sqrt(1 - chi**2)))
+
+
+def bhns_scattering_initial_parameters(eos_path: str, MNS_B: float,
+                                       MBH: float, chi_BH: float,
+                                       D: float, EoM_list: tuple,
+                                       Pphi_list: tuple) -> None:
+  """
+  Takes a certain BHNS binary with specified component masses and distance,
+  and from a Newtonian estimate at large distance with initial hyperbolic
+  energy and angular momentum computes the initial infall velocity and
+  orbital angular momentum that has to be specified in many initial data
+  solvers such as Elliptica.
+
+  Parameters:
+  eos_path (str): Path to the EOS cold-slice in .h5 format (PyCompOSE).
+  MNS_B  (float): Baryonic mass of the neutron star.
+  MBH    (float): Irreducible mass of the black hole.
+  chi_BH (float): Dimensionless spin of the black hole.
+  D      (float): Distance between the objects (in solar masses).
+  EoM_list (tuple): Tuple with initial binary energies E/M.
+  Pphi_list (tuple): Tuple with initial dimensionless angular momenta.
+
+  Returns:
+  Nothing. Prints table with the initial binary parameters.
+  """
+  # Load the EOS and use the root finder to get the gravitational mass
+  # of the NS for the specified EOS and at the target baryonic mass.
+  lP, f_e, f_rho0 = load_compose_h5_cold_slice_code(eos_path)
+  _, m_ns, mb_ns, R_ns = tov_from_baryonic_mass(MNS_B, lP, f_e, f_rho0)
+
+  # Compute the masses.
+  m_chr = christodolou_mass(MBH, chi_BH)
+  S_bh  = chi_BH ** m_chr**2
+
+  M  = m_chr + m_ns                      # total mass
+  nu = symmetric_mass_ratio(m_chr, m_ns) # symmetric mass ratio
+  mu = nu * M                            # reduced mass
+
+  print(f"NS : M = {m_ns:.4f}  M_b = {mb_ns:.4f}  R = {R_ns:.2f} ({R_ns*1.4767:.1f} km)")
+  print(f"BH : M_irr = {MBH}  chi = {chi_BH}  ->  M = {m_chr:.4f},  S = {S_bh:.3f}")
+  print(f"M = {M:.4f}  mu = {mu:.4f}  nu = {nu:.4f}  q = {m_chr / m_ns:.3f}")
+  print(f"D = {D} code units = {D/M:.2f} M   (2M/D = {2*M/D:.4f}: size of the Newtonian term)\n")
+
+  hdr = (" E/M   p_phi   v_inf    b/M   rp/M  chi_N |  Omega        v_r      |"
+        " |v_NS| |v_BH| |  E_ADM    J_ADM   t_peri")
+  print(hdr)
+  print("-" * len(hdr))
+
+  # Loop over the list of energies and angular momenta.
+  for E_over_M in EoM_list:
+    # ------------------------------------------------------------------------
+    # Step 1: E -> relative speed at infinity (exact special relativity).
+    # ------------------------------------------------------------------------
+    gamma_inf = 1 + (E_over_M**2 - 1) / (2 * nu)
+    v_inf = np.sqrt(1 - 1 / gamma_inf**2)
+
+    for p_phi in Pphi_list:
+      L = p_phi * mu * M   # orbital angular momentum
+
+      # --------------------------------------------------------------------
+      # Step 2: L -> tangential relative speed at separation D.
+      # --------------------------------------------------------------------
+      v_t = L / (mu * D)
+
+      # --------------------------------------------------------------------
+      # Step 3: Newtonian energy conservation from infinity down to D.
+      # --------------------------------------------------------------------
+      v = np.sqrt(v_inf**2 + 2 * M / D)
+
+      # --------------------------------------------------------------------
+      # Step 4: the remaining speed is radial.
+      # --------------------------------------------------------------------
+      v_r = -np.sqrt(v**2 - v_t**2)
+
+      # --------------------------------------------------------------------
+      # Step 5: Elliptica parameters.
+      # --------------------------------------------------------------------
+      Omega = v_t / D
+
+      # --------------------------------------------------------------------
+      # Step 6: Diagnostics.
+      # --------------------------------------------------------------------
+      # Object velocity from CM mass fractions.
+      v_ns = v * m_chr / M
+      v_bh = v * m_ns / M
+
+      # Newtonian impact parameter, eccentricity, periapsis and
+      # scattering angle.
+      b     = p_phi * M / v_inf
+      ecc   = np.sqrt(1 + v_inf**2 * p_phi**2)
+      r_p   = p_phi**2 * M / (1 + ecc)
+      chi_N = np.degrees(2 * np.arcsin(1 / ecc))
+
+      # Convergence parameters.
+      E_adm = E_over_M * M
+      J_adm = L + S_bh
+
+      # Periapsis estimate.
+      t_peri = D / abs(v_r)
+
+      print(f"{E_over_M:5.3f} {p_phi:5.1f}  {v_inf:6.3f}  {b/M:6.2f} {r_p/M:5.2f} {chi_N:5.1f} |"
+            f" {Omega:.5e} {v_r:+.5f} |"
+            f"  {v_ns:.3f}  {v_bh:.3f} | {E_adm:7.4f}  {J_adm:6.2f}  {t_peri:6.0f}")
 
 
 def symmetric_mass_ratio(m1, m2):
