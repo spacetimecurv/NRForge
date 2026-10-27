@@ -3,12 +3,16 @@
 ####################################################
 # Built-in libraries.
 import sys
+import h5py
 
 # Third-party libraries.
 import numpy as np
 from scipy.interpolate import interp1d
 
-# ------------ CompOSE MR-curves -------------
+# NRForge utility.
+from nrforge.utils.constants import M_N, c_CGS, G_CGS, Msun_CGS, MeV_CGS
+
+# ------------ CompOSE tables -------------
 # If a CompOSE table as a MR-curve, i.e. a
 # eos.mr file, fetch the data and interpolate
 # the radius for a given mass or mass for
@@ -55,6 +59,46 @@ def compose_get_R_from_MR(path: str, M: float) -> float:
   radius_interpolator = interp1d(mass, radius, kind="linear")
 
   return radius_interpolator(M)
+
+
+# Load CompOSE .h5 cold-slice processed by PyCompOSE and
+# convert to code units.
+def load_compose_h5_cold_slice_code(path):
+  """
+  Return log-interpolants e(P) and rho0(P) in code units
+  from a CompOSE cold-slice in .h5 format (converted with PyCompOSE).
+
+  Parameters:
+  path (str): Path to the .h5 table.
+
+  Returns:
+  log of the pressure, and interpolants for log(e) and log(rho0).
+  """
+  # Load the table.
+  with h5py.File(path, "r") as f:
+    nb = f["nb"][:]
+    mn = f["mn"][()]
+    Q1 = f["Q1"][:, 0, 0]
+    Q7 = f["Q7"][:, 0, 0]
+
+  # Define pressure and energy density.
+  p_MeV = Q1 * nb                 # pressure          [MeV/fm^3]
+  e_MeV = nb * mn * (1 + Q7)      # energy density    [MeV/fm^3]
+
+  # Constants and Conversions.
+  fm_CGS  = 1.0e-13                                 # cm
+  MeV_fm3 = MeV_CGS / fm_CGS**3                     # 1 MeV/fm^3 in erg/cm^3
+  geo     = G_CGS**3 * Msun_CGS**2 / c_CGS**8       # erg/cm^3 -> code units
+  P       = p_MeV * MeV_fm3 * geo
+  e       = e_MeV * MeV_fm3 * geo
+  rho0 = nb / fm_CGS**3 * (M_N * 1e3) * geo * c_CGS**2
+
+  # Define the interpolators.
+  lP     = np.log(P)
+  f_e    = interp1d(lP, np.log(e), fill_value="extrapolate")
+  f_rho0 = interp1d(lP, np.log(rho0), fill_value="extrapolate")
+  return lP, f_e, f_rho0
+
 
 # ------------ ELLIPTICA EOS TABLES -------------
 # The following functions are specific to the formatted

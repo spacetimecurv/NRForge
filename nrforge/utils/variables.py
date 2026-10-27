@@ -49,6 +49,55 @@ def chi_effective(q: float, chi1: float, chi2: float) -> float:
   return m1 * chi1 + m2 * chi2
 
 
+def infall_velocity_PN_estimate_bhns(mbh, mns, chi, D):
+  """
+  Compute the binary infall velocity from a Post-Newtonian estimate.
+
+  Parameters:
+  mbh (float): irreducible mass of BH (in solar masses).
+  mns (float): TOV ADM mass of NS (in solar masses).
+  chi (float): spin of the BH.
+  D   (float): distance between objects.
+
+  Returns:
+  Infall velocity as PN estimate.
+  """
+  mbhc = christodolou_mass(mbh, chi)
+  eta  = symmetric_mass_ratio(mbhc, mns)
+  M    = mbhc + mns
+  return -(64 / 5) * eta * M**3 / D**3
+
+
+def christodolou_mass(Mirr, chi):
+  """
+  Calculate the Christodolous mass from the irreducible
+  mass of the BH and the spin magnitude chi.
+
+  Parameters:
+  Mirr (float): irreducible mass of the BH.
+  chi  (float): spin of the BH.
+
+  Returns:
+  Christodolou mass.
+  """
+  return Mirr * np.sqrt(2 / (1 + np.sqrt(1 - chi**2)))
+
+
+def symmetric_mass_ratio(m1, m2):
+  """
+  Computes the symmetric mass ratio given two component masses.
+
+  Parameters:
+  m1 (float): Component mass 1.
+  m2 (float): Component mass 2.
+
+  Returns:
+  Symmetric mass ratio.
+  """
+  M = m1 + m2
+  return (m1 * m2) / M**2
+
+
 def q_to_nu(q: float) -> float:
   """
   Converts the mass ratio q into the symmetric mass
@@ -338,3 +387,6 @@ def get_ms_from_solar_masses(Msolar: float) -> float:
   M_ms = G_SI * M / c_SI**3 * 1e3
 
   return M_ms
+
+if __name__ == '__main__':
+  print(infall_velocity_PN_estimate_bhns(4.3, 1.45, 0.75, 40))
