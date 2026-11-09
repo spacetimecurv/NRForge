@@ -66,7 +66,10 @@ elliptica.plot_constraints_per_patch_group(groups={
   "right_outermost":  ("#0072B2", "outermost (right)"),
 })
 elliptica.plot_target_system_convergence()
-
+elliptica.monitor_log(
+  keys=["Mirr", "chi", "rBH", "Mb", "Px", "Py", "Om", "OmBH"],
+  every=50, targets={'Mirr': 4.3, 'chi': 0.75}, window=50
+)
 
 # Comparison mode: specify a list of paths of the same system, and
 #                  a matching list of labels. This runs through

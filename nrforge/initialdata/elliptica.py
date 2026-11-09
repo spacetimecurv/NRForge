@@ -197,6 +197,26 @@ def _infer_system(name: str) -> str:
   return "BHNS" if "BH" in name and "NS" in name else None
 
 
+# Regular expressions for logfile monitoring.
+_NUM = r"([-+]?\d\.\d+e[-+]\d+)"
+_MONITOR_PATTERNS = {
+  "Mirr": r"BH_irreducible_mass_current\s*=\s*{n},\|{n}",
+  "chi":  r"BH_chi_z_current\s*=\s*{n}",
+  "rBH":  r"BH_perfect_s2_radius\s*=\s*{n}",
+  "OmBH": r"BH_omega_z\s*=\s*{n}",
+  "Mb":   r"NS_baryonic_mass_current\s*=\s*{n},\|{n}",
+  "Px":   r"Current P_ADM = \(([^,]+),",
+  "Py":   r"Current P_ADM = \([^,]+,([^,]+),",
+  "Om":   r"{sys}_angular_velocity\s*=\s*{n}",
+  "Wr":   r"update weight {10,}=\s*{n}",
+}
+
+# TODO: add the other system keys here as well.
+_MONITOR_KEYS = {
+  "BHNS": ["Mirr", "chi", "rBH", "Mb", "Px", "Py", "Om", "OmBH"],
+}
+
+
 # ==============================================================================
 # Elliptica class.
 # ==============================================================================
@@ -796,6 +816,69 @@ class Elliptica:
                        'slurm-*.out or *.out. Check the path!')
     self.logs_path = logs
     print(f'  {_style("$", _DIM)} Found logs under: {_style(self.logs_path, _CYAN)}')
+
+
+  # Monitor target convergence from the logfile.
+  def monitor_log(self, keys: list = None, targets: dict = None,
+                  every: int = 10, window: int = 50) -> None:
+    """
+    Monitor the convergence of some system parameters.
+
+    Parameters:
+    keys    (list): labels from _MONITOR_PATTERNS to show. Defaults to _MONITOR_KEYS[self.system].
+    targets (dict): label -> target value, e.g. {'Mirr': 4.3, 'chi': 0.75}.
+    every    (int): print every n-th iteration.
+    window   (int): number of final iterations used for the drift summary.
+
+    Returns:
+    None.
+    """
+    # Check if logs are found.
+    if self.logs_path is None:
+      print(f'  {_style("$", _DIM)} Logs not loaded yet; searching...')
+      self.locate_logfiles()
+
+    keys     = keys or _MONITOR_KEYS[self.system]
+    targets  = targets or {}
+    patterns = {k: re.compile(_MONITOR_PATTERNS[k].replace("{n}", _NUM)
+                                                  .replace("{sys}", self.system))
+                for k in set(keys) | {"Wr"}}
+
+    H, it = {}, -1
+    for f in self.logs_path:
+      print(f'  {_style("$", _DIM)} Monitoring log: {_style(f, _CYAN)}')
+      for line in open(f, errors="replace"):
+        if line.startswith("{ Outermost iteration"):
+          it = int(line.split()[3]); H[it] = {}
+          continue
+        if it < 0:
+          continue
+        for k, p in patterns.items():
+          m = p.search(line)
+          if m and (m.lastindex == 1 or float(m.group(2)) != 0.0):
+            H[it][k] = float(m.group(1))
+
+      its = sorted(i for i in H if keys[0] in H[i])
+      print(f"    {'it':>4} " + " ".join(f"{k:>11}" for k in keys) + "   Wr")
+      for i in its:
+        if i % every == 0 or i == its[-1]:
+          h = H[i]
+          print(f"    {i:4d} " + " ".join(f"{h.get(k, np.nan):11.5g}" for k in keys)
+                + f"   {h.get('Wr', np.nan):.2g}")
+
+      last = [H[i] for i in its[-window:]]
+      if len(last) < 10:
+        return
+      print(f"\n    last {window} iterations: max - min (drift)")
+      for k in keys:
+        v = [h[k] for h in last if k in h]
+        if not v:
+          continue
+        line = f"     {k:5s} {max(v) - min(v):.3e}   (last {v[-1]:.6g})"
+        if k in targets:
+          t = targets[k]
+          line += f" | rel. dev. {v[-1]/t - 1:+.2e}" if t else f"   abs. dev. {v[-1] - t:+.2e}"
+        print(line)
 
 
   # ==============================================================================
