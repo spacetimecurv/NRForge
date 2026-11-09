@@ -9,7 +9,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import Iterator
 import statistics
-import subprocess
+import subprocess, tempfile, shutil
 import json
 from datetime import datetime
 
@@ -22,6 +22,7 @@ from pathlib import Path
 from matplotlib.lines import Line2D
 import matplotlib.transforms as mtransforms
 import matplotlib.colors as mcolors
+import pandas as pd
 
 # NRForge libraries.
 from nrforge.utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
@@ -1600,3 +1601,86 @@ class EllipticaComparison:
     if not out_dir.is_dir():
       raise SystemExit(f"Output directory {out_dir} does not exist!")
     _save_figure(fig, out_dir, output_file, "target convergence comparison")
+
+
+  def latex_comparison_table(self, keep: list = None, output_dir: str = None, 
+                             output_file: str = "id_comparison_table",
+                             reference: int | str = 0, diffs: str = "relative") -> None:
+    """
+    Create a comparison table between initial data sets with differences.
+
+    Parameters:
+    keep       (list): List of <system>_properties.txt parameters to keep.
+    output_dir  (str): Directory where the table should be stored. If not given
+                       store in the current working directory.
+    output_file (str): Name of the output file.
+    reference (int|str): Index or label of the run that all differences are taken against.
+    diffs         (str): 'absolute', 'relative', 'both', 'spread' or 'none'.
+                         'spread' adds max-min and (max-min)/|mean| over all runs.
+
+    Returns:
+    None.
+    """
+    # First check whether the run has already loaded the properties.
+    for run in self.runs:
+      if run.prop_dic is None:
+        run.locate_properties()
+        run.read_properties()
+      else:
+        print(f"  {_style("$", _DIM)} Properties already loaded; skipping...")
+
+    # Create the LaTeX table.
+    def to_float(x):
+      """Try to convert the parameter value to float."""
+      try:
+        return float(np.asarray(x).ravel()[0]) if np.ndim(x) else float(x)
+      except (TypeError, ValueError):
+        return np.nan
+
+    # Create a table.
+    df = pd.DataFrame({lab: {k: to_float(v) for k, v in run.prop_dic.items()}
+                      for run, lab in zip(self.runs, self.labels)})
+
+    df = df if keep is None else df.loc[keep]
+    ref = self.labels[reference] if isinstance(reference, int) else reference
+    if ref not in df.columns:
+      raise ValueError(f"Reference '{ref}' not in labels {self.labels}.")
+    others = [lab for lab in self.labels if lab != ref]
+
+    if diffs == "spread":
+      vals = df[self.labels]
+      df["Spread"] = vals.max(axis=1) - vals.min(axis=1)
+      df["Rel. Spread"] = df["Spread"] / vals.mean(axis=1).abs()
+    elif diffs != "none":
+      cols = {}
+      for lab in others:
+        d = df[lab] - df[ref]
+        if diffs in ("absolute", "both"):
+          cols[rf"$\Delta$ {lab}"] = d
+        if diffs in ("relative", "both"):
+          cols[rf"$\delta$ {lab}"] = d / df[ref].abs()
+      df = pd.concat([df, pd.DataFrame(cols, index=df.index)], axis=1)
+
+    df.index = [k.replace("_", r"\_") for k in df.index]
+    body = df.to_latex(float_format=lambda x: f"{x:.6e}", na_rep="--",
+                      column_format="l" + "r" * df.shape[1], escape=False)
+
+    tex = r"""\documentclass[border=4pt]{standalone}
+    \usepackage{booktabs}
+    \begin{document}
+    %s
+    \end{document}""" % body
+
+    # Compile.
+    tmp = Path(tempfile.mkdtemp())
+    (tmp / "table.tex").write_text(tex)
+    subprocess.run(["pdflatex", "-interaction=nonstopmode", "table.tex"], cwd=tmp, check=True,
+                  stdout=subprocess.DEVNULL)
+    subprocess.run(["pdftoppm", "-png", "-r", "300", "-singlefile", "table.pdf", "table"], cwd=tmp, check=True)
+    out_dir = Path(output_dir) if output_dir is not None else Path.cwd()
+    if not out_dir.is_dir():
+      raise SystemExit(f"Output directory {out_dir} does not exist!")
+    
+    shutil.copy(tmp / "table.png", out_dir / f"{output_file}.png")
+    shutil.copy(tmp / "table.pdf", out_dir / f"{output_file}.pdf")
+    

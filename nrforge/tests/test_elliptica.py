@@ -85,3 +85,20 @@ cmp.plot_target_system_convergence(quantities=[
 
 for run in cmp:
   run.plot_constraints_per_patch_group()
+
+# Create a comparison LaTeX table.
+keep = [
+  "BH_x_CM", "BH_y_CM", "BH_z_CM",
+  "BH_min_radius", "BH_Komar_mass", "BH_irreducible_mass_current",
+  "BH_Christodoulou_mass_current", "BH_chi_z_current",
+  "NS_x_CM", "NS_y_CM", "NS_z_CM", "NS_TOV_radius",
+  "NS_TOV_ADM_mass", "NS_baryonic_mass_current", "NS_rho0_center",
+  "BHNS_x_CM", "BHNS_y_CM", "BHNS_z_CM",
+  "BHNS_ADM_mass", "BHNS_angular_velocity", "BHNS_binding_energy"
+]
+
+cmp.latex_comparison_table(
+  keep=keep,
+  output_dir="/home/no96soq/athenak/runs/PROJECT_largescale/initial_data/bhns/convergence_tuning/production/comparison_results",
+  diffs="both"
+)
