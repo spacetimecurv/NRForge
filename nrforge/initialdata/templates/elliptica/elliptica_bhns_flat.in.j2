@@ -8,7 +8,7 @@ Project = {{ project }}
 #### BH-NS binary:
 BHNS_separation                  = {{ separation }}
 BHNS_angular_velocity            = auto
-BHNS_infall_velocity             = 0
+BHNS_infall_velocity             = {{ infall_vel }}
 BHNS_start_off                   = parameter_file
 BHNS_observe_ADM_P               = S_obj1+S_obj2,default
 BHNS_observe_ADM_J               = S_obj1+S_obj2,default
@@ -30,10 +30,10 @@ BH_start_off               = IsoSchild
 BH_surface_type            = perfect_s2
 BH_surface_Ylm_max_l       = 1
 BH_tune_BH_radius_criteria = fix_irreducible_mass
-BH_mass_tolerance          = 1E-8
-BH_radius_update_weight    = 0.(x10)->0.2(x540)->0.
-BH_spin_update_weight      = 0.(x10)->0.2(x540)->0.
-BH_spin_tolerance          = 1E-3
+BH_mass_tolerance          = 1E-5
+BH_radius_update_weight    = 0.0(x10)->0.2
+BH_spin_update_weight      = 0.0(x10)->0.2
+BH_spin_tolerance          = 1E-5
 
 #### NS:
 NS_baryonic_mass               = {{ ns_baryonic_mass }}
@@ -42,12 +42,6 @@ NS_EoS_type                    = tabular
 NS_EoS_unit                    = compose
 NS_EoS_table_path              = {{ eos_table_path }}
 NS_EoS_table_format            = line,number_density,total_energy_density,pressure
-NS_EoS_interpolation_method    = Hermite1D
-NS_EoS_interpolation_use_log   = yes
-NS_EoS_Hermite1D_FD_accuracy   = 3
-NS_EoS_Hermite1D_num_points    = 2
-NS_EoS_enthalpy_floor          = {{ ns_h_floor }}
-NS_Eos_enthalpy_ceiling        = {{ ns_h_ceil }}
 NS_Omega_x                     = {{ ns_omegax }}
 NS_Omega_y                     = {{ ns_omegay }}
 NS_Omega_z                     = {{ ns_omegaz }}
@@ -111,9 +105,9 @@ grid_outermost_radius      = 1E5
 grid_verbose               = no
 
 #### resolutions:
-n_a = 14(x200)->16(x100)->18(x100)->20(x100)->22(x70)
-n_b = 14(x200)->16(x100)->18(x100)->20(x100)->22(x70)
-n_c = 14(x200)->16(x100)->18(x100)->20(x100)->22(x70)
+n_a = 14(x1000)->16(x150)->18(x150)->20(x150)->22(x100)
+n_b = 14(x1000)->16(x150)->18(x150)->20(x150)->22(x100)
+n_c = 14(x1000)->16(x150)->18(x150)->20(x150)->22(x100)
 grid_SplitCS_max_n_a = 40
 grid_SplitCS_max_n_b = 40
 grid_SplitCS_max_n_c = 40

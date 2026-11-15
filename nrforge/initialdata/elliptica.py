@@ -25,7 +25,10 @@ import matplotlib.colors as mcolors
 import pandas as pd
 
 # NRForge libraries.
-from nrforge.utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22
+from nrforge.utils.variables import get_id_gw_frequency_Hz, get_id_gw_frequency_Hz_22, \
+                                    infall_velocity_PN_estimate_bhns
+from nrforge.utils.eos_utils import load_compose_h5_cold_slice_code
+from nrforge.utils.numerics import tov_from_gravitational_mass
 from nrforge.utils.style import _style, _fmt, _BOLD, _DIM, _CYAN
 
 
@@ -422,26 +425,41 @@ class Elliptica:
     path (str): path to where the parameter file should be written.
     """
     # Create the directory.
-    params = self.user_params
+    params = dict(self.user_params)
     BASE_DIR = Path(__file__).resolve().parent
     TEMPLATE_DIR = BASE_DIR / "templates" / "elliptica"
     obj1, obj2 = params["project"].split("_")[0], \
                  params["project"].split("_")[1]
     m1, m2     = 0.0, 0.0
     if self.system == 'BHNS':
-      template_name = "elliptica_bhns.in.j2"
+      templates = {"flat": "elliptica_bhns_flat.in.j2", "kerr-schild": "elliptica_bhns_ks.in.j2"}
+      free_data = params.get('free_data', 'flat')
+      if free_data not in templates:
+        raise SystemExit(f"free_data has to be one of {list(templates)}, not '{free_data}'.")
+      template_name = templates[free_data]
       if "->" in str(params['bh_irreducible_mass']): # iterated mass
         m1     = float(params['bh_irreducible_mass'].split("->")[-1])
       else:
         m1     = float(params['bh_irreducible_mass'])
-      m2       = float(params['ns_baryonic_mass'])
       s1       = np.sqrt(float(params['bh_chix'])**2 + float(params['bh_chiy'])**2 \
                         + float(params['bh_chiz'])**2)
       s2       = np.sqrt(float(params['ns_omegax'])**2 + float(params['ns_omegay'])**2 \
                               + float(params['ns_omegaz'])**2)
       sep      = params['separation']
-      self.simname = params['ns_eos_name'] + f"_M{obj1}-" + str(round(m1,1)) + f"_s{obj1}-" \
-                    + str(round(s1,2)) + f"--M{obj2}-" + str(round(m2,2)) + f"_s{obj2}-" + str(round(s2,2)) \
+
+      # NS: target TOV ADM mass -> baryonic mass from a TOV solve on the .h5 cold slice.
+      m_ns_adm = float(params['ns_adm_mass'])
+      lP, f_e, f_rho0 = load_compose_h5_cold_slice_code(params['eos_h5_path'])
+      _, m_tov, m2, r_tov = tov_from_gravitational_mass(m_ns_adm, lP, f_e, f_rho0)
+      params['ns_baryonic_mass'] = f"{m2:.12f}"
+      print(f"  {_style("$", _DIM)} NS TOV: M_ADM = {m_tov:.6f}, M_b = {m2:.6f}, R = {r_tov:.4f}")
+
+      # Infall velocity from the PN estimate.
+      params['infall_vel'] = f"{infall_velocity_PN_estimate_bhns(m1, m_ns_adm, s1, float(sep)):.6e}"
+      print(f"  {_style("$", _DIM)} PN infall velocity = {params['infall_vel']}")
+
+      self.simname = params['ns_eos_name'] + f"_M{obj1}-" + str(round(m1,2)) + f"_s{obj1}-" \
+                    + str(round(s1,2)) + f"--M{obj2}-" + str(round(params['ns_adm_mass'],2)) + f"_s{obj2}-" + str(round(s2,2)) \
                     + "--d" + str(sep)
       self.path    = Path(path) / self.simname
       try:
@@ -471,24 +489,59 @@ class Elliptica:
     Parameters:
     bashname (str): name of the bashfile.
     cluster  (str): name of the cluster to run on.
-    id_exe   (str): path to the Elliptica executable.
+    id_exe   (str): path to the Elliptica executable. On DRACO it is copied into
+                    the run directory as ./elliptica and run from there.
     """
-    cluster_list = ["ARA"]
+    cluster_list = ["ARA", "DRACO"]
     if cluster not in cluster_list:
       raise SystemExit(f"Currently supported clusters are: {cluster_list}")
 
     # Cluster specifics.
+    exe     = id_exe
+    run_dir = self.path.resolve()
     if cluster == "ARA":
       cluster_setup = {
         "partition": "s_standard",
         "cpus"     : "36",
         "wallclock": "8-00:00:00",
         "memory"   : "180G",
-        "modules"  : ["intel/oneapi/latest", "mpi/openmpi/5.0.2/gcc"]
+        "sbatch"   : [],
+        "modules"  : ["intel/oneapi/latest", "mpi/openmpi/5.0.2/gcc"],
+        "env"      : [],
+        "prefix"   : ""
+      }
+    elif cluster == "DRACO":
+      # 2 x 24-core Ice Lake 8360Y with hyperthreading (96 logical CPUs). The 48 threads
+      # are pinned to socket 0 and its hyperthreads (CPUs 0-23,48-71).
+      cluster_setup = {
+        "partition": "standard",
+        "cpus"     : "48",
+        "wallclock": "3-00:00:00",
+        "memory"   : "240G",
+        "sbatch"   : ["--exclusive", f"--chdir={run_dir}"],
+        "modules"  : [],
+        "env"      : ["export OMP_PROC_BIND=spread",
+                      "export OMP_PLACES=cores",
+                      "# System OpenBLAS 0.3.15 misdetects Ice Lake as Prescott/SSE3: ~7x slower dgemm",
+                      "export OPENBLAS_CORETYPE=SkylakeX",
+                      "# ./lib/libopenblas.so.0 -> OpenMP OpenBLAS build (the default soname is serial)",
+                      f"export LD_LIBRARY_PATH={run_dir}/lib:$LD_LIBRARY_PATH"],
+        "prefix"   : "taskset -c 0-23,48-71 "
       }
 
+      # Copy the executable into the run directory and link the OpenMP OpenBLAS.
+      exe = "./elliptica"
+      shutil.copy2(id_exe, self.path / "elliptica")
+      (self.path / "lib").mkdir(exist_ok=True)
+      blas_link = self.path / "lib" / "libopenblas.so.0"
+      if blas_link.is_symlink() or blas_link.exists():
+        blas_link.unlink()
+      blas_link.symlink_to("/lib64/libopenblaso.so.0")
+      print(f"  {_style("$", _DIM)} Copied {_style(id_exe, _CYAN)} and linked lib/libopenblas.so.0 "
+            f"-> /lib64/libopenblaso.so.0")
+
     bash_path = self.path / bashname
-    bss = open(bash_path, 'a')
+    bss = open(bash_path, 'w')
     bss.write('#!/bin/bash\n')
     bss.write(f'#SBATCH --job-name={self.simname}\n')
     bss.write('#SBATCH --output=slurm-%j.out\n')
@@ -499,6 +552,8 @@ class Elliptica:
     bss.write(f'#SBATCH --cpus-per-task={cluster_setup['cpus']}\n')
     bss.write(f'#SBATCH --time={cluster_setup['wallclock']}\n')
     bss.write(f'#SBATCH --mem={cluster_setup['memory']}\n')
+    for opt in cluster_setup['sbatch']:
+      bss.write(f'#SBATCH {opt}\n')
     bss.write('\n# ==============================\n')
     bss.write('# Modules\n')
     bss.write('# ==============================\n\n')
@@ -509,8 +564,14 @@ class Elliptica:
     bss.write('# Job\n')
     bss.write('# ==============================\n\n')
     bss.write('export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK\n')
-    bss.write(f'cd {self.path}\n\n')
-    bss.write(f"{id_exe} -nt $SLURM_CPUS_PER_TASK {self.simname}.par")
+    for line in cluster_setup['env']:
+      bss.write(f'{line}\n')
+    bss.write(f'cd {run_dir}\n\n')
+    if cluster == "DRACO":
+      bss.write('echo "node: $(hostname)"\n')
+      bss.write(f'echo "binary: {exe} ($(md5sum {exe} | cut -c1-32))"\n')
+      bss.write(f"echo \"blas: $(ldd {exe} | grep -o 'libopenblas[^ ]* => [^ ]*')\"\n\n")
+    bss.write(f"{cluster_setup['prefix']}{exe} -nt $SLURM_CPUS_PER_TASK {self.simname}.par\n")
     bss.close()
 
     print(f"  {_style("$", _DIM)} Wrote bash script to {_style(bash_path, _CYAN)}")

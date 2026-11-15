@@ -9,18 +9,12 @@ For the initial data solver [Elliptica](https://github.com/rashti-alireza/Ellipt
 ```python
 import json
 from nrforge.initialdata.elliptica import Elliptica, get_iterated_bh_mass
-from nrforge.utils.eos_utils import load_elliptica_table, calculate_enthalpy_bounds
-
-mass = get_iterated_bh_mass(mass=4.3, sequence=[50, 50, 50, 20], gap=0.5)
-rows = load_elliptica_table(path='data/DD2_eos.txt', geo=False)
-h_floor, h_ceil = calculate_enthalpy_bounds(rows=rows, margin=5e-4, ceil_trim=0, print_info=False)
+from nrforge.utils.eos_utils import load_elliptica_table
 
 with open("../initialdata/templates/elliptica/bhns_params.json", "r") as file:
   user_params = json.load(file)
 
 user_params['bh_irreducible_mass'] = mass
-user_params['ns_h_floor']         = h_floor
-user_params['ns_h_ceil']          = h_ceil
 elliptica = Elliptica.create(path='/path/to/ID', user_params=user_params, system='BHNS')
 elliptica.write_bashfile(bashname="BHNS.slurm", cluster="ARA", id_exe="/path/to/Elliptica/Exe/elliptica")
 elliptica.submit_job()
@@ -37,7 +31,7 @@ options = {"eos_name": "DD2",
 eos_path = eosympose.run(**options)
 ```
 
-This tells EOSympOSE to fetch the DD2 table from the CompOSE database and write it into the format `Elliptica` expects. Other tables can be easily added to the config file in EOSympOSE (see the README.md there). What usually helps with stability, especially when using equation-of-state tables with `Elliptica` is to iterate over the irreducible mass of the black hole, which is why we can explicitely set an iteration sequence in the .json file or compute it with `get_iterated_bh_mass` as in the snippet above. Furthermore, depending on the equation-of-state the enthalpy floor might be different, and we can use the function `calculate_enthalpy_bounds` to calculate the enthalpy bounds from the example equation of state given in `tests/data`. These are best practices and do not have to be followed. If desired we can also write a slurm file and submit the job directly. Currently only supported is `ARA`, but an extension to other machines is trivial. Once everything worked, we will have an initial data folder with naming based on the binary parameters, a parameter file and a slurm file. The run can now start!
+This tells EOSympOSE to fetch the DD2 table from the CompOSE database and write it into the format `Elliptica` expects. Other tables can be easily added to the config file in EOSympOSE (see the README.md there). If desired we can also write a slurm file and submit the job directly. Currently only supported is `ARA` and 'DRACO', but an extension to other machines is trivial. Once everything worked, we will have an initial data folder with naming based on the binary parameters, a parameter file and a slurm file. The run can now start!
 
 To monitor the run, we can switch to 'analyze' mode via
 
