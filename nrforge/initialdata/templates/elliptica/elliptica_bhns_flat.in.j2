@@ -42,9 +42,15 @@ NS_EoS_type                    = tabular
 NS_EoS_unit                    = compose
 NS_EoS_table_path              = {{ eos_table_path }}
 NS_EoS_table_format            = line,number_density,total_energy_density,pressure
-NS_Omega_x                     = {{ ns_omegax }}
-NS_Omega_y                     = {{ ns_omegay }}
-NS_Omega_z                     = {{ ns_omegaz }}
+NS_chi_x                       = {{ ns_chix }}
+NS_chi_y                       = {{ ns_chiy }}
+NS_chi_z                       = {{ ns_chiz }}
+{%- if ns_chiz != 0 or ns_chiy != 0 or ns_chix != 0 %}
+NS_spin_update_weight          = 0.(x10)->0.2
+NS_spin_tolerance              = 1E-3
+{%- else %}
+NS_spin_update_weight          = 0.
+{%- endif %}
 NS_surface_type                = perfect_s2->topology_s2
 NS_surface_finder              = bisection
 NS_surface_change_threshold    = 0.0

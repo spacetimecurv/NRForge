@@ -203,15 +203,16 @@ def _infer_system(name: str) -> str:
 # Regular expressions for logfile monitoring.
 _NUM = r"([-+]?\d\.\d+e[-+]\d+)"
 _MONITOR_PATTERNS = {
-  "Mirr": r"BH_irreducible_mass_current\s*=\s*{n},\|{n}",
-  "chi":  r"BH_chi_z_current\s*=\s*{n}",
-  "rBH":  r"BH_perfect_s2_radius\s*=\s*{n}",
-  "OmBH": r"BH_omega_z\s*=\s*{n}",
-  "Mb":   r"NS_baryonic_mass_current\s*=\s*{n},\|{n}",
-  "Px":   r"Current P_ADM = \(([^,]+),",
-  "Py":   r"Current P_ADM = \([^,]+,([^,]+),",
-  "Om":   r"{sys}_angular_velocity\s*=\s*{n}",
-  "Wr":   r"update weight {10,}=\s*{n}",
+  "Mirr":  r"BH_irreducible_mass_current\s*=\s*{n},\|{n}",
+  "chi":   r"BH_chi_z_current\s*=\s*{n}",
+  "chiNS": r"NS_chi_z_current\s*=\s*{n}",
+  "rBH":   r"BH_perfect_s2_radius\s*=\s*{n}",
+  "OmBH":  r"BH_omega_z\s*=\s*{n}",
+  "Mb":    r"NS_baryonic_mass_current\s*=\s*{n},\|{n}",
+  "Px":    r"Current P_ADM = \(([^,]+),",
+  "Py":    r"Current P_ADM = \([^,]+,([^,]+),",
+  "Om":    r"{sys}_angular_velocity\s*=\s*{n}",
+  "Wr":    r"update weight {10,}=\s*{n}",
 }
 
 # TODO: add the other system keys here as well.
@@ -443,8 +444,8 @@ class Elliptica:
         m1     = float(params['bh_irreducible_mass'])
       s1       = np.sqrt(float(params['bh_chix'])**2 + float(params['bh_chiy'])**2 \
                         + float(params['bh_chiz'])**2)
-      s2       = np.sqrt(float(params['ns_omegax'])**2 + float(params['ns_omegay'])**2 \
-                              + float(params['ns_omegaz'])**2)
+      s2       = np.sqrt(float(params['ns_chix'])**2 + float(params['ns_chiy'])**2 \
+                              + float(params['ns_chiz'])**2)
       sep      = params['separation']
 
       # NS: target TOV ADM mass -> baryonic mass from a TOV solve on the .h5 cold slice.
@@ -750,7 +751,10 @@ class Elliptica:
           "NS TOV ADM mass"      : float(self.prop_dic["NS_TOV_ADM_mass"]),
           "NS Omega-x"           : float(self.prop_dic["NS_Omega_x"]),
           "NS Omega-y"           : float(self.prop_dic["NS_Omega_y"]),
-          "NS Omega-z"           : float(self.prop_dic["NS_Omega_z"])
+          "NS Omega-z"           : float(self.prop_dic["NS_Omega_z"]),
+          "NS chi-x"             : float(self.prop_dic["NS_chi_x_current"]),
+          "NS chi-y"             : float(self.prop_dic["NS_chi_y_current"]),
+          "NS chi-z"             : float(self.prop_dic["NS_chi_z_current"])
         },
         "eos": {
           "type" : self.prop_dic["NS_EoS_type"],

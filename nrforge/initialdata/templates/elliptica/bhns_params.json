@@ -9,8 +9,8 @@
   "ns_eos_name"         : "DD2",
   "eos_table_path"      : "/path/to/eos.txt",
   "eos_h5_path"         : "/path/to/eos.h5",
-  "ns_omegax"           : 0.0,
-  "ns_omegay"           : 0.0,
-  "ns_omegaz"           : 0.0,
+  "ns_chix"             : 0.0,
+  "ns_chiy"             : 0.0,
+  "ns_chiz"             : 0.0,
   "free_data"           : "flat"
 }

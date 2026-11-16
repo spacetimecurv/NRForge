@@ -41,7 +41,14 @@ num_levels          = {{ num_levels }}
 refinement_interval = 1
 
 <z4c_amr>
-method = tracker
+method          = tracker
+disk_reflevel   = {{ num_levels - 1 }}
+disk_rmax       = 50.0
+disk_zmax       = 10.0
+disk_tracker    = 0
+disk_auto       = true
+disk_merger_sep = 0.01
+disk_delay      = 0.0
 
 <amr_criterion0>
 method = user
@@ -70,10 +77,10 @@ x3max = {{ ref2_x3max }}
 <time>
 evolution  = dynamic    # dynamic/kinematic/static
 integrator = rk3        # time integration algorithm
-cfl_number = {{ cfl }}       # Courant, Friedrichs, & Lewy (CFL) Number
+cfl_number = 0.25       # Courant, Friedrichs, & Lewy (CFL) Number
 nlim	     = -1		      # cycle limit
 tlim       = {{ tlim }}    # time limit
-ndiag      = {{ ndiag }}		      # cycles between diagnostic output
+ndiag      = 1		      # cycles between diagnostic output
 
 # =======================================================
 # Coordinates and excision
@@ -97,11 +104,6 @@ texcise         = {{ tfloor }}
 # EMF flux correction
 excision_flux_emf = false
 
-# Freeze excision
-freeze_excision        = false
-freeze_excision_radius = true
-freeze_excision_center = false
-
 # =======================================================
 # GRMHD evolution
 # =======================================================
@@ -122,8 +124,8 @@ use_NQT         = false
 nscalars        = 1
 
 # Riemann solver and reconstruction scheme
-reconstruct     = {{ reconstruction }}       # spatial reconstruction method
-rsolver         = {{ riemann }}        # Riemann solver to be used
+reconstruct     = wenoz       # spatial reconstruction method
+rsolver         = hlle        # Riemann solver to be used
 
 # FOFC
 enforce_maximum = false
@@ -156,7 +158,7 @@ shift_eta       = {{ z4c_eta }}        # Shift damping term (2/Mtot)
 shift_zero	    = true		          # Set the initial shift to zero (option: donothing)
 
 # Dissipation parameters
-diss            = {{ KO_diss }}               # Kreiss-Oliger dissipation parameter
+diss            = 0.5               # Kreiss-Oliger dissipation parameter
 chi_div_floor   = 1e-05		          # (DEFAULT)
 
 # Constraint damping
@@ -201,16 +203,15 @@ npunct             = 1
 num_horizons       = 1
 
 # Grid points
-ntheta             = 10
+ntheta             = 20
 lmax               = 8
 
 # Puncture 0
 use_puncture_0     = 0
-center_x_0         = 0.0
-center_y_0         = 13.48397047
-center_z_0         = 0.0
-hmean_tol_0        = 300.0
+hrms_tol_0         = 0.1
 mass_tol_0         = 1e-4
+spec_tol_0         = 1e-2
+flow_iterations_0  = 300
 
 start_time_0       = 0.0
 stop_time_0        = {{ tlim }}
@@ -218,81 +219,29 @@ stop_time_0        = {{ tlim }}
 # AHF output
 output_ylm         = false
 output_grid        = false
-verbose            = true
+verbose            = false
 
 # =======================================================
 # M1 neutrino transport
 # =======================================================
 <radiation_m1>
-# Matter-Radiation coupling
-gr_sources      = true # (DEFAULT)
-matter_sources  = true # (DEFAULT)
-backreact       = true # (DEFAULT)
-backreact_tmunu = true # (DEFAULT)
-
-# Closure
-theta_limiter          = true    # DEFAULT: false
-closure_epsilon        = 1e-5    # (DEFAULT)
-closure_maxiter        = 64      # (DEFAULT)
-closure_fun            = minerbo # (DEFAULT)
-closure_solver         = brent   # (DEFAULT)
-
-# Floors
-rad_N_floor = {{ rad_N_floor }}
-rad_E_floor = {{ rad_E_floor }}
-
-# Sources
-rad_eps            = 1e-14    # (DEFAULT)
-source_epsabs      = 1e-15    # (DEFAULT)
-source_epsrel      = 1e-5     # (DEFAULT)
-source_maxiter     = 64       # (DEFAULT)
-source_Ye_min      = 0.0      # (DEFAULT)
-source_Ye_max      = 0.6      # (DEFAULT)
-source_thick_limit = 20.0     # (DEFAULT)
-source_therm_limit = -1.0     # (DEFAULT)
-source_scat_limit  = -1.0     # (DEFAULT)
-minmod_theta       = 1        # (DEFAULT)
-source_limiter     = 0.5      # (DEFAULT)
-beam_sources       = false    # (DEFAULT)
-src_update         = implicit # (DEFAULT)
-
-# Opacities
-opacity_type = bns-nurates # DEFAULT: none
+closure_fun     = minerbo
+src_update      = implicit
+opacity_type    = bns-nurates
+closure_solver  = newton
+closure_maxiter = 10
 
 # =======================================================
 # BNS_nurates opacity library (online)
 # =======================================================
 <bns_nurates>
-# Parameters
-opacity_tau_trap     = 1.0  # (DEFAULT)
-opacity_tau_delta    = 1.0  # (DEFAULT)
-opacity_corr_fac_max = 3.0  # (DEFAULT)
-nb_min_fm-3          = {{ nb_rad_floor }} # (THC) WeakRates::rho_min_cgs = 1.0e8
-temp_min_mev         = {{ tfloor }}
-
-# Reactions
-use_abs_em          = true  # (DEFAULT)
-use_pair            = true  # (DEFAULT)
-use_brem            = true  # (DEFAULT)
-use_iso             = true  # (DEFAULT)
-use_inelastic_scatt = {{ use_inelastic }}
-use_WM_ab           = true  # (DEFAULT)
-use_WM_sc           = true  # (DEFAULT)
-use_dU              = true  # (DEFAULT)
-use_dm_eff          = false # (DEFAULT)
-
-# Distribution
-{%- if use_equilibrium %}
-use_equilibrium_distribution = true
-{%- else %}
+use_inelastic_scatt          = true
 use_equilibrium_distribution = false
-{%- endif %}
-use_kirchhoff_law            = true  # (DEFAULT)
-use_nonthermal_separated     = true  # (DEFAULT)
-use_NN_medium_corr           = true  # (DEFAULT)
-neglect_blocking             = false # (DEFAULT)
-use_decay                    = true  # (DEFAULT)
-use_BRT_brem                 = false # (DEFAULT)
+use_decay                    = true
+use_dm_eff                   = false
+kirchhoff_tau_trap           = 1.0
+use_eq_fallback_temp         = false
+use_eq_fallback_y            = false
 
 # =======================================================
 # Problem generator
@@ -327,8 +276,8 @@ id        = mhd_w_bcc_xy
 file_type = bin
 variable  = mhd_w_bcc
 dt        = 30.0
-slice_x1  = 0.0
-id        = mhd_w_bcc_yz
+slice_x2  = 0.0
+id        = mhd_w_bcc_xz
 
 <output3>
 file_type = bin
@@ -341,36 +290,36 @@ id        = z4c_xy
 file_type = bin
 variable  = z4c
 dt        = 30.0
-slice_x1  = 0.0
-id        = z4c_yz
+slice_x2  = 0.0
+id        = z4c_xz
 
 <output5>
 file_type = bin
-variable  = rad_m1_E
+variable  = rad_m1_moments
 dt        = 30.0
 slice_x3  = 0.0
-id        = rad_m1_E_xy
+id        = rad_m1_moments_xy
 
 <output6>
 file_type = bin
-variable  = rad_m1_N
+variable  = rad_m1_moments
 dt        = 30.0
-slice_x3  = 0.0
-id        = rad_m1_N_xy
+slice_x2  = 0.0
+id        = rad_m1_moments_xz
 
 <output7>
 file_type = bin
-variable  = rad_m1_E
+variable  = rad_m1_opacities
 dt        = 30.0
-slice_x1  = 0.0
-id        = rad_m1_E_yz
+slice_x3  = 0.0
+id        = rad_m1_opacities_xy
 
 <output8>
 file_type = bin
-variable  = rad_m1_N
+variable  = rad_m1_opacities
 dt        = 30.0
-slice_x1  = 0.0
-id        = rad_m1_N_yz
+slice_x2  = 0.0
+id        = rad_m1_N_xz
 {%- endif %}
 
 # History output
@@ -387,76 +336,40 @@ dt        = 500.0
 # Spherical output (Ejecta/Neutrinos/Tracers)
 {%- if enable_sphere_output %}
 <output11>
-file_type     = sph
-variable      = mhd_w_bcc
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
+file_type      = sph
+variable       = mhd_w_bcc
+dt             = 20.0
+radii          = 300.0, 400.0
+ntheta         = 256
+theta_spacing  = uniform_theta
+center_tracker = 0
 
 <output12>
-file_type     = sph
-variable      = adm
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
+file_type      = sph
+variable       = adm
+dt             = 20.0
+radii          = 300.0, 400.0
+ntheta         = 256
+theta_spacing  = uniform_theta
+center_tracker = 0
 
 <output13>
-file_type     = sph
-variable      = z4c_alpha
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
+file_type      = sph
+variable       = z4c_gauge
+dt             = 20.0
+radii          = 300.0, 400.0
+ntheta         = 256
+theta_spacing  = uniform_theta
+center_tracker = 0
 
 <output14>
-file_type     = sph
-variable      = z4c_betax
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
-
-<output15>
-file_type     = sph
-variable      = z4c_betay
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
-
-<output16>
-file_type     = sph
-variable      = z4c_betaz
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
-
-<output17>
-file_type     = sph
-variable      = rad_m1_N
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
-
-<output18>
-file_type     = sph
-variable      = rad_m1_E
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
-
-<output19>
-file_type     = sph
-variable      = rad_m1_F
-dt            = 20.0
-radii         = 300.0, 400.0
-ntheta        = 256
-theta_spacing = uniform_theta
+file_type      = sph
+variable       = rad_m1_moments
+dt             = 20.0
+radii          = 300.0, 400.0
+ntheta         = 256
+theta_spacing  = uniform_theta
+center_tracker = 0
 {%- endif %}
 
 {%- if enable_tracer_output %}
@@ -548,38 +461,52 @@ theta_centering = cell
 # 3D output
 {%- if enable_3D_output %}
 <output27>
-file_type = bin
+file_type = sph
 variable  = mhd_w_bcc
-dt        = 500.0
-id        = mhd_w_bcc_3D
+dt        = 100.0
+r_min     = 5.0
+r_max     = 500.0
+nradii    = 50
+r_spacing = linear
+ntheta    = 128
 
 <output28>
-file_type = bin
+file_type = sph
 variable  = adm
-dt        = 500.0
-id        = adm_3D
+dt        = 100.0
+r_min     = 5.0
+r_max     = 500.0
+nradii    = 50
+r_spacing = linear
+ntheta    = 128
 
 <output29>
-file_type = bin
-variable  = z4c_alpha
-dt        = 500.0
-id        = alpha_3D
+file_type = sph
+variable  = z4c_gauge
+dt        = 100.0
+r_min     = 5.0
+r_max     = 500.0
+nradii    = 50
+r_spacing = linear
+ntheta    = 128
 
 <output30>
-file_type = bin
-variable  = z4c_betax
-dt        = 500.0
-id        = betax_3D
+file_type = sph
+variable  = rad_m1_moments
+dt        = 100.0
+r_min     = 5.0
+r_max     = 500.0
+nradii    = 50
+r_spacing = linear
+ntheta    = 128
 
 <output31>
-file_type = bin
-variable  = z4c_betay
-dt        = 500.0
-id        = betay_3D
-
-<output32>
-file_type = bin
-variable  = z4c_betaz
-dt        = 500.0
-id        = betaz_3D
+file_type = sph
+variable  = rad_m1_opacities
+dt        = 100.0
+r_min     = 5.0
+r_max     = 500.0
+nradii    = 50
+r_spacing = linear
+ntheta    = 128
 {%- endif %}

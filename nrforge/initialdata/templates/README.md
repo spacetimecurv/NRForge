@@ -27,6 +27,6 @@ The available parameters inside the `bhns_params.json` file are:
 - `eos_table_path`: path to the CompOSE table
 - `ns_h_floor`: floor on the enthalpy (can be computed based on the equation-of-state with `calculate_enthalpy_bounds`)
 - `ns_h_ceil`: ceiling on the enthalpy (can be computed based on the equation-of-state with `calculate_enthalpy_bounds`)
-- `ns_omegax`: x-component of the neutron star spin
-- `ns_omegay`: y-component of the neutron star spin
-- `ns_omegaz`: z-component of the neutron star spin
+- `ns_chix`: x-component of the dimensionless neutron star spin
+- `ns_chiy`: y-component of the dimensionless neutron star spin
+- `ns_chiz`: z-component of the dimensionless neutron star spin

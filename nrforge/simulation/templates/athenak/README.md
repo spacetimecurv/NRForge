@@ -110,7 +110,7 @@ For different resolutions, the user can find templates for the parameter file (t
 
 | File | Resolution |
 | ---- | ---------- |
-| `athenak_bhns_elliptica_vlr.json` | 370m |
-| `athenak_bhns_elliptica_mr.json` | 240m |
-| `athenak_bhns_elliptica_sr.json` | 180m |
-| `athenak_bhns_elliptica_hr.json` | 90m |
+| `athenak_bhns_elliptica_lr.json` | 246m |
+| `athenak_bhns_elliptica_sr.json` | 184m |
+| `athenak_bhns_elliptica_hr.json` | 123m |
+| `athenak_bhns_elliptica_vhr.json` | 92m |
