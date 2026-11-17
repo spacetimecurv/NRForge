@@ -100,7 +100,9 @@ This will take the path to the initial data we just created, create a run direct
 - `bfield_type` - type of the magnetic field (either `pressure_poloidal` (internal dipole) or `current_loop` (external dipole))
 - `enable_tracer_output` - whether to enable tracer output
 - `enable_sphere_output` - whether to enable sphere output for ejecta analysis etc.
-- `enable_3D_output` - whether to enable 3D output
+- `enable_sph_volume` - whether to enable the BH-centered spherical volume output (log-spaced radii) for the disk analysis
+- `enable_3D_bin` - whether to enable the sparse full 3D binary output (resolution diagnostics, spectra)
+- `enable_pdf_output` - whether to enable the mass-weighted (density, radius) PDF output
 - `enable_2D_output` - whether to enable 2D output
 - `nrad_wave_extraction` - number of spheres for the gravitational wave extraction
 - `waveform_radius_spacing` - spacing between waveform surfaces

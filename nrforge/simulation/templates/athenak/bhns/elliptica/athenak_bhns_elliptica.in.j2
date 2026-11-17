@@ -319,7 +319,7 @@ file_type = bin
 variable  = rad_m1_opacities
 dt        = 30.0
 slice_x2  = 0.0
-id        = rad_m1_N_xz
+id        = rad_m1_opacities_xz
 {%- endif %}
 
 # History output
@@ -342,6 +342,7 @@ dt             = 20.0
 radii          = 300.0, 400.0
 ntheta         = 256
 theta_spacing  = uniform_theta
+weights        = false
 center_tracker = 0
 
 <output12>
@@ -351,6 +352,7 @@ dt             = 20.0
 radii          = 300.0, 400.0
 ntheta         = 256
 theta_spacing  = uniform_theta
+weights        = false
 center_tracker = 0
 
 <output13>
@@ -360,6 +362,7 @@ dt             = 20.0
 radii          = 300.0, 400.0
 ntheta         = 256
 theta_spacing  = uniform_theta
+weights        = false
 center_tracker = 0
 
 <output14>
@@ -369,6 +372,7 @@ dt             = 20.0
 radii          = 300.0, 400.0
 ntheta         = 256
 theta_spacing  = uniform_theta
+weights        = false
 center_tracker = 0
 {%- endif %}
 
@@ -384,6 +388,7 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 
 <output21>
 file_type       = sph
@@ -396,6 +401,7 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 
 <output22>
 file_type       = sph
@@ -408,6 +414,7 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 
 <output23>
 file_type       = sph
@@ -420,6 +427,7 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 
 <output24>
 file_type       = sph
@@ -432,6 +440,7 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 
 <output25>
 file_type       = sph
@@ -444,6 +453,7 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 
 <output26>
 file_type       = sph
@@ -456,57 +466,142 @@ nradii          = 128
 ntheta          = 128
 theta_spacing   = uniform_theta
 theta_centering = cell
+weights         = false
 {%- endif %}
 
 # 3D output
-{%- if enable_3D_output %}
+{%- if enable_sph_volume %}
 <output27>
-file_type = sph
-variable  = mhd_w_bcc
-dt        = 100.0
-r_min     = 5.0
-r_max     = 500.0
-nradii    = 50
-r_spacing = linear
-ntheta    = 128
+file_type       = sph
+variable        = mhd_w_bcc
+dt              = 100.0
+r_min           = 5.0
+r_max           = 500.0
+nradii          = 256
+r_spacing       = log
+ntheta          = 128
+theta_spacing   = uniform_costheta
+theta_centering = cell
+weights         = false
+center_tracker  = 0
 
 <output28>
-file_type = sph
-variable  = adm
-dt        = 100.0
-r_min     = 5.0
-r_max     = 500.0
-nradii    = 50
-r_spacing = linear
-ntheta    = 128
+file_type       = sph
+variable        = adm
+dt              = 100.0
+r_min           = 5.0
+r_max           = 500.0
+nradii          = 256
+r_spacing       = log
+ntheta          = 128
+theta_spacing   = uniform_costheta
+theta_centering = cell
+weights         = false
+center_tracker  = 0
 
 <output29>
-file_type = sph
-variable  = z4c_gauge
-dt        = 100.0
-r_min     = 5.0
-r_max     = 500.0
-nradii    = 50
-r_spacing = linear
-ntheta    = 128
+file_type       = sph
+variable        = z4c_gauge
+dt              = 100.0
+r_min           = 5.0
+r_max           = 500.0
+nradii          = 256
+r_spacing       = log
+ntheta          = 128
+theta_spacing   = uniform_costheta
+theta_centering = cell
+weights         = false
+center_tracker  = 0
 
 <output30>
-file_type = sph
-variable  = rad_m1_moments
-dt        = 100.0
-r_min     = 5.0
-r_max     = 500.0
-nradii    = 50
-r_spacing = linear
-ntheta    = 128
+file_type       = sph
+variable        = rad_m1_moments
+dt              = 100.0
+r_min           = 5.0
+r_max           = 500.0
+nradii          = 256
+r_spacing       = log
+ntheta          = 128
+theta_spacing   = uniform_costheta
+theta_centering = cell
+weights         = false
+center_tracker  = 0
 
 <output31>
-file_type = sph
+file_type       = sph
+variable        = rad_m1_opacities
+dt              = 100.0
+r_min           = 5.0
+r_max           = 500.0
+nradii          = 256
+r_spacing       = log
+ntheta          = 128
+theta_spacing   = uniform_costheta
+theta_centering = cell
+weights         = false
+center_tracker  = 0
+{%- endif %}
+
+{%- if enable_3D_bin %}
+<output32>
+file_type = bin
+variable  = mhd_w_bcc
+dt        = 2000.0
+id        = mhd_w_bcc_3D
+
+<output33>
+file_type = bin
+variable  = adm
+dt        = 2000.0
+id        = adm_3D
+
+<output34>
+file_type = bin
+variable  = z4c_gauge
+dt        = 2000.0
+id        = z4c_gauge_3D
+
+<output35>
+file_type = bin
+variable  = rad_m1_moments
+dt        = 2000.0
+id        = rad_m1_moments_3D
+
+<output36>
+file_type = bin
 variable  = rad_m1_opacities
-dt        = 100.0
-r_min     = 5.0
-r_max     = 500.0
-nradii    = 50
-r_spacing = linear
-ntheta    = 128
+dt        = 2000.0
+id        = rad_m1_opacities_3D
+{%- endif %}
+
+{%- if enable_pdf_output %}
+<output37>
+file_type     = pdf
+variable      = mhd_w_d
+dt            = 5.0
+nbin          = 128
+bin_min       = {{ dfloor }}
+bin_max       = 1e-2
+logscale      = true
+variable_2    = r_sph
+nbin2         = 512
+bin2_min      = 0.1
+bin2_max      = 1536
+logscale2     = true
+mass_weighted = true
+
+<output38>
+file_type     = pdf
+variable      = mhd_u_d
+dt            = 5.0
+nbin          = 128
+bin_min       = {{ dfloor }}
+bin_max       = 1e-2
+logscale      = true
+variable_2    = r_sph
+nbin2         = 512
+bin2_min      = 0.1
+bin2_max      = 1536
+logscale2     = true
+mass_weighted = true
 {%- endif %}
