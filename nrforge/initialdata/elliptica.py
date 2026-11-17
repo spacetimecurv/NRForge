@@ -490,25 +490,28 @@ class Elliptica:
     Parameters:
     bashname (str): name of the bashfile.
     cluster  (str): name of the cluster to run on.
-    id_exe   (str): path to the Elliptica executable. On DRACO it is copied into
-                    the run directory as ./elliptica and run from there.
+    id_exe   (str): path to the Elliptica executable. It is copied into the run
+                    directory as ./elliptica and run from there.
     """
     cluster_list = ["ARA", "DRACO"]
     if cluster not in cluster_list:
       raise SystemExit(f"Currently supported clusters are: {cluster_list}")
 
     # Cluster specifics.
-    exe     = id_exe
     run_dir = self.path.resolve()
     if cluster == "ARA":
+      # s_standard: 2 x 18-core Xeon Gold 6140 with hyperthreading (72 logical CPUs).
       cluster_setup = {
         "partition": "s_standard",
         "cpus"     : "36",
         "wallclock": "8-00:00:00",
         "memory"   : "180G",
-        "sbatch"   : [],
-        "modules"  : ["intel/oneapi/latest", "mpi/openmpi/5.0.2/gcc"],
-        "env"      : [],
+        "sbatch"   : ["--exclusive", "--hint=nomultithread", f"--chdir={run_dir}"],
+        "modules"  : [],
+        "env"      : ["export OMP_PROC_BIND=spread",
+                      "export OMP_PLACES=cores",
+                      "# ./lib/libopenblas.so.0 -> OpenMP OpenBLAS build (the default soname is serial)",
+                      f"export LD_LIBRARY_PATH={run_dir}/lib:$LD_LIBRARY_PATH"],
         "prefix"   : ""
       }
     elif cluster == "DRACO":
@@ -530,16 +533,16 @@ class Elliptica:
         "prefix"   : "taskset -c 0-23,48-71 "
       }
 
-      # Copy the executable into the run directory and link the OpenMP OpenBLAS.
-      exe = "./elliptica"
-      shutil.copy2(id_exe, self.path / "elliptica")
-      (self.path / "lib").mkdir(exist_ok=True)
-      blas_link = self.path / "lib" / "libopenblas.so.0"
-      if blas_link.is_symlink() or blas_link.exists():
-        blas_link.unlink()
-      blas_link.symlink_to("/lib64/libopenblaso.so.0")
-      print(f"  {_style("$", _DIM)} Copied {_style(id_exe, _CYAN)} and linked lib/libopenblas.so.0 "
-            f"-> /lib64/libopenblaso.so.0")
+    # Copy the executable into the run directory and link the OpenMP OpenBLAS.
+    exe = "./elliptica"
+    shutil.copy2(id_exe, self.path / "elliptica")
+    (self.path / "lib").mkdir(exist_ok=True)
+    blas_link = self.path / "lib" / "libopenblas.so.0"
+    if blas_link.is_symlink() or blas_link.exists():
+      blas_link.unlink()
+    blas_link.symlink_to("/lib64/libopenblaso.so.0")
+    print(f"  {_style("$", _DIM)} Copied {_style(id_exe, _CYAN)} and linked lib/libopenblas.so.0 "
+          f"-> /lib64/libopenblaso.so.0")
 
     bash_path = self.path / bashname
     bss = open(bash_path, 'w')
@@ -568,10 +571,10 @@ class Elliptica:
     for line in cluster_setup['env']:
       bss.write(f'{line}\n')
     bss.write(f'cd {run_dir}\n\n')
-    if cluster == "DRACO":
-      bss.write('echo "node: $(hostname)"\n')
-      bss.write(f'echo "binary: {exe} ($(md5sum {exe} | cut -c1-32))"\n')
-      bss.write(f"echo \"blas: $(ldd {exe} | grep -o 'libopenblas[^ ]* => [^ ]*')\"\n\n")
+    bss.write('echo "node: $(hostname)"\n')
+    bss.write(f'echo "binary: {exe} ($(md5sum {exe} | cut -c1-32))"\n')
+    bss.write(f"echo \"blas: $(ldd {exe} | grep -o 'libopenblas[^ ]* => [^ ]*')\"\n")
+    bss.write('echo "affinity: $(taskset -cp $$)"\n\n')
     bss.write(f"{cluster_setup['prefix']}{exe} -nt $SLURM_CPUS_PER_TASK {self.simname}.par\n")
     bss.close()
 
