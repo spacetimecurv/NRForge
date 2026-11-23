@@ -47,7 +47,7 @@ NS_chi_y                       = {{ ns_chiy }}
 NS_chi_z                       = {{ ns_chiz }}
 {%- if ns_chiz != 0 or ns_chiy != 0 or ns_chix != 0 %}
 NS_spin_update_weight          = 0.(x10)->0.2
-NS_spin_tolerance              = 1E-3
+NS_spin_tolerance              = 1E-5
 {%- else %}
 NS_spin_update_weight          = 0.
 {%- endif %}

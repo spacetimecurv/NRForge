@@ -698,7 +698,7 @@ class Elliptica:
 
     props = list(self.diag_dict.values())[-1]["props"]
     last  = props[list(props)[-1]]
-    lines = [f"{k} error: {abs(last[k + '_current'] - last[k]) * 100 / abs(last[k]):.2f}%"
+    lines = [f"{k} error: {abs(last[k + '_current'] - last[k]) * 100 / abs(last[k]):.4f}%"
              for k in sorted(last) if k + "_current" in last and last[k] != 0]
     if not lines:
       warnings.warn("No target quantities found in the diagnostics!")
