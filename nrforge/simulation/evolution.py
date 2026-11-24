@@ -105,8 +105,7 @@ class Evolution:
     print(f"{_style("Setting up the simulation directory...", _BOLD)}")
     # Check the paths.
     if not os.path.exists(ev_path):
-      raise SystemExit("Specified path for the creation of the evolution directory " \
-                       "does not exist!")
+      os.makedirs(ev_path, exist_ok=True)
 
     if not os.path.exists(id_path):
       raise SystemExit("Specified path to the initial data does not exist!")
